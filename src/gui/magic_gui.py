@@ -46,15 +46,16 @@ class magic_gui(tk.Tk):
 
         self.analysisMenu = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Analysis", menu=self.analysisMenu)
-        self.analysisMenu.add_command(label="Principal component analysis", state='disabled', command=self.runPCA)
-        self.analysisMenu.add_command(label="tSNE", state='disabled', command=self.runTSNE)
-        self.analysisMenu.add_command(label="Diffusion map", state='disabled', command=self.runDM)
+        self.analysisMenu.add_command(label="Principal Component Analysis", state='disabled', command=self.runPCA)
         self.analysisMenu.add_command(label="MAGIC", state='disabled', command=self.runMagic)
+        self.analysisMenu.add_command(label="PhenoGraph", state='disabled', command=None)
 
         self.visMenu = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Visualization", menu=self.visMenu)
+        self.visMenu.add_command(label="tSNE", state='disabled', command=self.runTSNE)
+        self.visMenu.add_command(label="Diffusion map", state='disabled', command=self.runDM)
         self.visMenu.add_command(label="Scatter plot", state='disabled', command=self.scatterPlot)
-        self.visMenu.add_command(label="PCA-variance plot", state='disabled', command=self.plotPCAVariance)
+        # self.visMenu.add_command(label="PCA-variance plot", state='disabled', command=self.plotPCAVariance)
         
         self.config(menu=self.menubar)
 
@@ -352,10 +353,10 @@ class magic_gui(tk.Tk):
         self.analysisMenu.entryconfig(0, state='normal')
         self.analysisMenu.entryconfig(1, state='normal')
         self.analysisMenu.entryconfig(2, state='normal')
-        self.analysisMenu.entryconfig(3, state='normal')
         self.fileMenu.entryconfig(4, state='normal')
         self.visMenu.entryconfig(0, state='normal')
         self.visMenu.entryconfig(1, state='normal')
+        self.visMenu.entryconfig(2, state='normal')
         self.concatButton = tk.Button(self, text=u"Concatenate selected datasets", state='disabled', wraplength=80, command=self.concatenateData)
         self.concatButton.grid(column=0, row=11)
         if len(self.data) > 1:
@@ -513,6 +514,7 @@ class magic_gui(tk.Tk):
         self.wait_window(self.pcaOptions)
 
     def _runPCA(self):
+        # TODO: implement PCA Variance Plot here
         for key in self.data_list.selection():
             curKey = self.data_list.item(key)['text'].split(' (')[0]
             self.data[curKey]['scdata'].run_pca(n_components=self.nComponents.get(), random=self.randomVar.get())
@@ -520,8 +522,86 @@ class magic_gui(tk.Tk):
             self.data_list.insert(key, 'end', text=curKey + ' PCA' + 
                               ' (' + str(self.data[curKey]['scdata'].pca.shape[0]) + 
                                 ' x ' + str(self.data[curKey]['scdata'].pca.shape[1]) + ')', open=True)
-        self.visMenu.entryconfig(1, state='normal')
+        # self.visMenu.entryconfig(1, state='normal')
         self.pcaOptions.destroy()
+
+    def runMagic(self):
+        for key in self.data_list.selection():
+            # pop up for parameters
+            self.magicOptions = tk.Toplevel()
+            self.magicOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": MAGIC options")
+            self.curKey = key
+
+            tk.Label(self.magicOptions, text=u"# of PCA components:", fg="black", bg="white").grid(column=0, row=1)
+            self.nCompVar = tk.IntVar()
+            self.nCompVar.set(20)
+            tk.Entry(self.magicOptions, textvariable=self.nCompVar).grid(column=1, row=1)
+
+            self.randomVar = tk.BooleanVar()
+            self.randomVar.set(True)
+            tk.Checkbutton(self.magicOptions, text=u"Randomized PCA", variable=self.randomVar).grid(column=0, row=2,
+                                                                                                    columnspan=2)
+
+            tk.Label(self.magicOptions, text=u"t:", fg="black", bg="white").grid(column=0, row=3)
+            self.tVar = tk.IntVar()
+            self.tVar.set(6)
+            tk.Entry(self.magicOptions, textvariable=self.tVar).grid(column=1, row=3)
+
+            tk.Label(self.magicOptions, text=u"k:", fg="black", bg="white").grid(column=0, row=4)
+            self.kVar = tk.IntVar()
+            self.kVar.set(30)
+            tk.Entry(self.magicOptions, textvariable=self.kVar).grid(column=1, row=4)
+
+            tk.Label(self.magicOptions, text=u"ka:", fg="black", bg="white").grid(column=0, row=5)
+            self.autotuneVar = tk.IntVar()
+            self.autotuneVar.set(10)
+            tk.Entry(self.magicOptions, textvariable=self.autotuneVar).grid(column=1, row=5)
+
+            tk.Label(self.magicOptions, text=u"Epsilon:", fg="black", bg="white").grid(column=0, row=6)
+            self.epsilonVar = tk.IntVar()
+            self.epsilonVar.set(1)
+            tk.Entry(self.magicOptions, textvariable=self.epsilonVar).grid(column=1, row=6)
+
+            tk.Label(self.magicOptions, text=u"(Epsilon 0 is the uniform kernel)", fg="black", bg="white").grid(
+                column=0, columnspan=2, row=7)
+
+            self.rescaleVar = tk.IntVar()
+            self.rescaleVar.set(99)
+            tk.Label(self.magicOptions, text=u"Rescale data to ", fg="black", bg="white").grid(column=0, row=8)
+            tk.Entry(self.magicOptions, textvariable=self.rescaleVar).grid(column=1, row=8)
+            tk.Label(self.magicOptions, text=u" percentile", fg="black", bg="white").grid(column=2, row=8)
+            tk.Label(self.magicOptions, text=u"0 is no rescale (use for log-transformed data).").grid(row=9, column=0,
+                                                                                                      columnspan=2)
+
+            tk.Button(self.magicOptions, text="Cancel", command=self.magicOptions.destroy).grid(column=0, row=10)
+            tk.Button(self.magicOptions, text="Run", command=self._runMagic).grid(column=1, row=10)
+            self.wait_window(self.magicOptions)
+
+    def _runMagic(self):
+        name = self.data_list.item(self.curKey)['text'].split(' (')[0]
+
+        self.magicOptions.destroy()
+        self.magicProgress = tk.Toplevel()
+        self.magicProgress.title(name + ': Running MAGIC')
+        tk.Label(self.magicProgress, text="Running MAGIC - refer to console for progress updates.").grid(column=0,
+                                                                                                         row=0)
+
+        self.data[name]['scdata'].run_magic(n_pca_components=self.nCompVar.get() if self.nCompVar.get() > 0 else None,
+                                            t=self.tVar.get(), k=self.kVar.get(), epsilon=self.epsilonVar.get(),
+                                            rescale_percent=self.rescaleVar.get(), ka=self.autotuneVar.get(),
+                                            random_pca=self.randomVar.get())
+
+        self.data[name + ' MAGIC'] = {'scdata': self.data[name]['scdata'].magic, 'wb': None, 'state': tk.BooleanVar(),
+                                      'genes': self.data[name]['scdata'].magic.data.columns.values, 'gates': {}}
+
+        self.data_list.insert(self.curKey, 'end', text=name + ' MAGIC' +
+                                                       ' (' + str(self.data[name]['scdata'].magic.data.shape[0]) +
+                                                       ' x ' + str(self.data[name]['scdata'].magic.data.shape[1]) + ')',
+                              open=True)
+        self.magicProgress.destroy()
+
+    # def runPhenoGraph(self):
+
 
     def runTSNE(self):
         for key in self.data_list.selection():
@@ -622,76 +702,7 @@ class magic_gui(tk.Tk):
                                  ' x ' + str(self.data[name]['scdata'].diffusion_eigenvectors.shape[1]) + ')', open=True)
             self.DMOptions.destroy()
 
-    def runMagic(self):
-        for key in self.data_list.selection():
-            #pop up for parameters
-            self.magicOptions = tk.Toplevel()
-            self.magicOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": MAGIC options")
-            self.curKey = key
-
-            tk.Label(self.magicOptions,text=u"# of PCA components:" ,fg="black",bg="white").grid(column=0, row=1)
-            self.nCompVar = tk.IntVar()
-            self.nCompVar.set(20)
-            tk.Entry(self.magicOptions, textvariable=self.nCompVar).grid(column=1,row=1)
-
-            self.randomVar = tk.BooleanVar()
-            self.randomVar.set(True)
-            tk.Checkbutton(self.magicOptions, text=u"Randomized PCA", variable=self.randomVar).grid(column=0, row=2, columnspan=2)
-
-            tk.Label(self.magicOptions,text=u"t:" ,fg="black",bg="white").grid(column=0, row=3)
-            self.tVar = tk.IntVar()
-            self.tVar.set(6)
-            tk.Entry(self.magicOptions, textvariable=self.tVar).grid(column=1,row=3)
-            
-            tk.Label(self.magicOptions,text=u"k:" ,fg="black",bg="white").grid(column=0, row=4)
-            self.kVar = tk.IntVar()
-            self.kVar.set(30)
-            tk.Entry(self.magicOptions, textvariable=self.kVar).grid(column=1,row=4)
-
-            tk.Label(self.magicOptions,text=u"ka:" ,fg="black",bg="white").grid(column=0, row=5)
-            self.autotuneVar = tk.IntVar()
-            self.autotuneVar.set(10)
-            tk.Entry(self.magicOptions, textvariable=self.autotuneVar).grid(column=1,row=5)
-
-            tk.Label(self.magicOptions,text=u"Epsilon:" ,fg="black",bg="white").grid(column=0, row=6)
-            self.epsilonVar = tk.IntVar()
-            self.epsilonVar.set(1)
-            tk.Entry(self.magicOptions, textvariable=self.epsilonVar).grid(column=1,row=6)
-
-            tk.Label(self.magicOptions, text=u"(Epsilon 0 is the uniform kernel)",fg="black",bg="white").grid(column=0,columnspan=2,row=7)
-
-            self.rescaleVar = tk.IntVar()
-            self.rescaleVar.set(99)
-            tk.Label(self.magicOptions, text=u"Rescale data to ",fg="black", bg="white").grid(column=0, row=8)
-            tk.Entry(self.magicOptions, textvariable=self.rescaleVar).grid(column=1, row=8)
-            tk.Label(self.magicOptions, text=u" percentile",fg="black", bg="white").grid(column=2, row=8)
-            tk.Label(self.magicOptions, text=u"0 is no rescale (use for log-transformed data).").grid(row=9, column=0, columnspan=2)
-
-            tk.Button(self.magicOptions, text="Cancel", command=self.magicOptions.destroy).grid(column=0, row=10)
-            tk.Button(self.magicOptions, text="Run", command=self._runMagic).grid(column=1, row=10)
-            self.wait_window(self.magicOptions)
-
-    def _runMagic(self):
-        name = self.data_list.item(self.curKey)['text'].split(' (')[0]
-
-        self.magicOptions.destroy()
-        self.magicProgress = tk.Toplevel()
-        self.magicProgress.title(name + ': Running MAGIC')
-        tk.Label(self.magicProgress, text="Running MAGIC - refer to console for progress updates.").grid(column=0, row=0)
-        
-        self.data[name]['scdata'].run_magic(n_pca_components=self.nCompVar.get() if self.nCompVar.get() > 0 else None,
-                                            t=self.tVar.get(), k=self.kVar.get(), epsilon=self.epsilonVar.get(), 
-                                            rescale_percent=self.rescaleVar.get(), ka=self.autotuneVar.get(),
-                                            random_pca=self.randomVar.get())
-        
-        self.data[name + ' MAGIC'] = {'scdata' : self.data[name]['scdata'].magic, 'wb' : None, 'state' : tk.BooleanVar(),
-                                      'genes' : self.data[name]['scdata'].magic.data.columns.values, 'gates' : {}}
-        
-        self.data_list.insert(self.curKey, 'end', text=name + ' MAGIC' +
-                              ' (' + str(self.data[name]['scdata'].magic.data.shape[0]) + 
-                              ' x ' + str(self.data[name]['scdata'].magic.data.shape[1]) + ')', open=True)
-        self.magicProgress.destroy()
-        
+    # to be integrated into the PCA function
     def plotPCAVariance(self):
         for key in self.data_list.selection():
             #pop up for parameters
@@ -712,6 +723,7 @@ class magic_gui(tk.Tk):
             tk.Button(self.plotOptions, text="Run", command=self._plotPCAVariance).grid(column=1, row=3)
             self.wait_window(self.plotOptions)
 
+    # to be integrated into the PCA function
     def _plotPCAVariance(self):
         name = self.data_list.item(self.curKey)['text'].split(' (')[0]
         self.fig = plt.figure(figsize=[6,6])
@@ -723,7 +735,7 @@ class magic_gui(tk.Tk):
 
         self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs)-1][0])
         self.canvas.show()
-        self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW') 
+        self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
         tk.Button(self.tabs[len(self.tabs)-1][0], text="Save", command=self.savePlot).grid(row=0, column=5, sticky='NE')
         tk.Button(self.tabs[len(self.tabs)-1][0], text="Close tab", command=self.closeCurrentTab).grid(row=1, column=5, sticky='NE')
