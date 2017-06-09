@@ -514,16 +514,37 @@ class magic_gui(tk.Tk):
         self.wait_window(self.pcaOptions)
 
     def _runPCA(self):
-        # TODO: implement PCA Variance Plot here
         for key in self.data_list.selection():
             curKey = self.data_list.item(key)['text'].split(' (')[0]
-            self.data[curKey]['scdata'].run_pca(n_components=self.nComponents.get(), random=self.randomVar.get())
 
+            # run PCA on the selected dataset
+            self.data[curKey]['scdata'].run_pca(n_components=self.nComponents.get(), random=self.randomVar.get())
             self.data_list.insert(key, 'end', text=curKey + ' PCA' + 
                               ' (' + str(self.data[curKey]['scdata'].pca.shape[0]) + 
                                 ' x ' + str(self.data[curKey]['scdata'].pca.shape[1]) + ')', open=True)
+
+            # plot component-variance plot with the input number of components
+            self.fig = plt.figure(figsize=[6, 6])
+            self.fig, self.ax = self.data[curKey]['scdata'].plot_pca_variance_explained(n_components=self.nComponents.get(),
+                                                                                      fig=self.fig,
+                                                                                      random=self.randomVar.get())
+
+            self.tabs.append([tk.Frame(self.notebook), self.fig])
+            self.notebook.add(self.tabs[len(self.tabs) - 1][0], text='PCA plot')
+
+            self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
+            self.canvas.show()
+            self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
+
+            tk.Button(self.tabs[len(self.tabs) - 1][0], text="Save", command=self.savePlot).grid(row=0, column=5,
+                                                                                                 sticky='NE')
+            tk.Button(self.tabs[len(self.tabs) - 1][0], text="Close tab", command=self.closeCurrentTab).grid(row=1,
+                                                                                                             column=5,
+                                                                                                             sticky='NE')
+            self.currentPlot = 'pca'
+            self.pcaOptions.destroy()
         # self.visMenu.entryconfig(1, state='normal')
-        self.pcaOptions.destroy()
+        # self.pcaOptions.destroy()
 
     def runMagic(self):
         for key in self.data_list.selection():
@@ -702,7 +723,7 @@ class magic_gui(tk.Tk):
                                  ' x ' + str(self.data[name]['scdata'].diffusion_eigenvectors.shape[1]) + ')', open=True)
             self.DMOptions.destroy()
 
-    # to be integrated into the PCA function
+    # already integrated into the PCA function
     def plotPCAVariance(self):
         for key in self.data_list.selection():
             #pop up for parameters
@@ -723,7 +744,7 @@ class magic_gui(tk.Tk):
             tk.Button(self.plotOptions, text="Run", command=self._plotPCAVariance).grid(column=1, row=3)
             self.wait_window(self.plotOptions)
 
-    # to be integrated into the PCA function
+    # already integrated into the PCA function
     def _plotPCAVariance(self):
         name = self.data_list.item(self.curKey)['text'].split(' (')[0]
         self.fig = plt.figure(figsize=[6,6])
