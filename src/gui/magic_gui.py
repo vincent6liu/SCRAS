@@ -48,7 +48,7 @@ class magic_gui(tk.Tk):
         self.menubar.add_cascade(label="Analysis", menu=self.analysisMenu)
         self.analysisMenu.add_command(label="Principal Component Analysis", state='disabled', command=self.runPCA)
         self.analysisMenu.add_command(label="MAGIC", state='disabled', command=self.runMagic)
-        self.analysisMenu.add_command(label="PhenoGraph", state='disabled', command=None)
+        self.analysisMenu.add_command(label="PhenoGraph", state='disabled', command=self.runPhenoGraph)
 
         self.visMenu = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Visualization", menu=self.visMenu)
@@ -621,7 +621,67 @@ class magic_gui(tk.Tk):
                               open=True)
         self.magicProgress.destroy()
 
-    # def runPhenoGraph(self):
+    def runPhenoGraph(self):
+        for key in self.data_list.selection():
+            # pop up for parameters
+            self.phenoOptions = tk.Toplevel()
+            self.phenoOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": PhenoGraph options")
+            self.curKey = key
+
+            tk.Label(self.phenoOptions, text=u"# of Nearest Neighbors:", fg="black", bg="white").grid(column=0, row=1)
+            self.nCompVar = tk.IntVar()
+            self.nCompVar.set(30)
+            tk.Entry(self.phenoOptions, textvariable=self.nCompVar).grid(column=1, row=1)
+
+            tk.Label(self.phenoOptions, text=u"Minimum cluster size:", fg="black", bg="white").grid(column=0, row=2)
+            self.tVar = tk.IntVar()
+            self.tVar.set(10)
+            tk.Entry(self.phenoOptions, textvariable=self.tVar).grid(column=1, row=2)
+
+            tk.Label(self.phenoOptions, text=u"Distance metric:", fg="black", bg="white").grid(column=0, row=3)
+            self.choiceVar = tk.StringVar()
+            choices = {'euclidean', 'manhattan', 'correlation', 'cosine'}
+            self.choiceVar.set('euclidean')
+            tk.OptionMenu(self.phenoOptions, self.choiceVar, *choices).grid(column=1, row=3)
+
+            tk.Label(self.phenoOptions, text=u"Number of jobs:", fg="black", bg="white").grid(column=0, row=4)
+            self.njobVar = tk.IntVar()
+            self.njobVar.set(-1)
+            tk.Entry(self.phenoOptions, textvariable=self.njobVar).grid(column=1, row=4)
+
+            tk.Label(self.phenoOptions, text=u"Tolerance:", fg="black", bg="white").grid(column=0, row=5)
+            self.toleVar = tk.DoubleVar()
+            self.toleVar.set(1e-3)
+            tk.Entry(self.phenoOptions, textvariable=self.toleVar).grid(column=1, row=5)
+
+            tk.Label(self.phenoOptions, text=u"Louvain time limit (s):", fg="black", bg="white").grid(column=0, row=6)
+            self.timeVar = tk.IntVar()
+            self.timeVar.set(2000)
+            tk.Entry(self.phenoOptions, textvariable=self.timeVar).grid(column=1, row=6)
+
+            tk.Label(self.phenoOptions, text=u"nn-method:", fg="black", bg="white").grid(column=0, row=7)
+            self.nnVar = tk.StringVar()
+            nn_choices = {'brute force', 'kdtree'}
+            self.nnVar.set('kdtree')
+            tk.OptionMenu(self.phenoOptions, self.nnVar, *nn_choices).grid(column=1, row=7)
+
+            self.directedVar = tk.BooleanVar()
+            self.directedVar.set(False)
+            tk.Checkbutton(self.phenoOptions, text=u"Directed Graph", variable=self.directedVar).grid(column=0, row=8)
+
+            self.pruneVar = tk.BooleanVar()
+            self.pruneVar.set(False)
+            tk.Checkbutton(self.phenoOptions, text=u"Prune", variable=self.pruneVar).grid(column=1, row=8)
+
+            self.jaccVar = tk.BooleanVar()
+            self.jaccVar.set(True)
+            tk.Checkbutton(self.phenoOptions, text=u"Jaccard Metric", variable=self.jaccVar).grid(column=2, row=8,
+                                                                                                  columnspan=2)
+
+            tk.Button(self.phenoOptions, text="Cancel", command=self.phenoOptions.destroy).grid(column=0, row=9)
+            # to be implemented
+            tk.Button(self.phenoOptions, text="Run", command=None).grid(column=1, row=9)
+            self.wait_window(self.phenoOptions)
 
 
     def runTSNE(self):
