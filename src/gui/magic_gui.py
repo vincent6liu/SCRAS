@@ -20,6 +20,7 @@ from tkinter import filedialog, ttk
 import pickle
 import random
 import phenograph
+import time
 
 class magic_gui(tk.Tk):
     def __init__(self,parent):
@@ -606,6 +607,8 @@ class magic_gui(tk.Tk):
         self.magicProgress.title(name + ': Running MAGIC')
         tk.Label(self.magicProgress, text="Running MAGIC - refer to console for progress updates.").grid(column=0,
                                                                                                          row=0)
+        self.magicProgress.update()
+
 
         self.data[name]['scdata'].run_magic(n_pca_components=self.nCompVar.get() if self.nCompVar.get() > 0 else None,
                                             t=self.tVar.get(), k=self.kVar.get(), epsilon=self.epsilonVar.get(),
@@ -619,6 +622,7 @@ class magic_gui(tk.Tk):
                                                        ' (' + str(self.data[name]['scdata'].magic.data.shape[0]) +
                                                        ' x ' + str(self.data[name]['scdata'].magic.data.shape[1]) + ')',
                               open=True)
+
         self.magicProgress.destroy()
 
     def runPhenoGraph(self):
@@ -629,14 +633,14 @@ class magic_gui(tk.Tk):
             self.curKey = key
 
             tk.Label(self.phenoOptions, text=u"# of Nearest Neighbors:", fg="black", bg="white").grid(column=0, row=1)
-            self.nCompVar = tk.IntVar()
-            self.nCompVar.set(30)
-            tk.Entry(self.phenoOptions, textvariable=self.nCompVar).grid(column=1, row=1)
+            self.nnnumVar = tk.IntVar()
+            self.nnnumVar.set(30)
+            tk.Entry(self.phenoOptions, textvariable=self.nnnumVar).grid(column=1, row=1)
 
             tk.Label(self.phenoOptions, text=u"Minimum cluster size:", fg="black", bg="white").grid(column=0, row=2)
-            self.tVar = tk.IntVar()
-            self.tVar.set(10)
-            tk.Entry(self.phenoOptions, textvariable=self.tVar).grid(column=1, row=2)
+            self.minsVar = tk.IntVar()
+            self.minsVar.set(10)
+            tk.Entry(self.phenoOptions, textvariable=self.minsVar).grid(column=1, row=2)
 
             tk.Label(self.phenoOptions, text=u"Distance metric:", fg="black", bg="white").grid(column=0, row=3)
             self.choiceVar = tk.StringVar()
@@ -680,8 +684,39 @@ class magic_gui(tk.Tk):
 
             tk.Button(self.phenoOptions, text="Cancel", command=self.phenoOptions.destroy).grid(column=0, row=9)
             # to be implemented
-            tk.Button(self.phenoOptions, text="Run", command=None).grid(column=1, row=9)
+            tk.Button(self.phenoOptions, text="Run", command=self._runPhenoGraph).grid(column=1, row=9)
             self.wait_window(self.phenoOptions)
+
+    def _runPhenoGraph(self):
+        name = self.data_list.item(self.curKey)['text'].split(' (')[0]
+
+        self.phenoOptions.destroy()
+        self.phenoProgress = tk.Toplevel()
+        self.phenoProgress.title(name + ': Running PhenoGraph')
+        tk.Label(self.phenoProgress, text="Running PhenoGraph - refer to console for progress updates.").grid(column=0,
+                                                                                                         row=0)
+        self.phenoProgress.update()
+
+        communities, graph, Q = phenograph.cluster(self.data[name]['scdata'].data, k=self.nnnumVar.get(),
+                                                   directed=self.directedVar.get(), prune=self.pruneVar.get(),
+                                                   min_cluster_size=self.minsVar.get(),jaccard=self.jaccVar.get(),
+                                                   primary_metric=self.choiceVar.get(), n_jobs=self.njobVar.get(),
+                                                   q_tol=self.toleVar.get(), louvain_time_limit=self.timeVar.get(),
+                                                   nn_method=self.nnVar.get())
+
+        # self.data[name + ' MAGIC'] = {'scdata': self.data[name]['scdata'].magic, 'wb': None, 'state': tk.BooleanVar(),
+        #                              'genes': self.data[name]['scdata'].magic.data.columns.values, 'gates': {}}
+
+        # self.data_list.insert(self.curKey, 'end', text=name + ' MAGIC' +
+        #                                               ' (' + str(self.data[name]['scdata'].magic.data.shape[0]) +
+        #                                              ' x ' + str(self.data[name]['scdata'].magic.data.shape[1]) + ')',
+        #                      open=True)
+
+        print(communities)
+        print(graph)
+        print(Q)
+
+        self.phenoProgress.destroy()
 
 
     def runTSNE(self):
