@@ -668,6 +668,7 @@ class magic_gui(tk.Tk):
         self.data_list.insert(self.curKey, 'end', text=name + ' tSNE' + 
                               ' (' + str(self.data[name]['scdata'].tsne.shape[0]) + 
                                 ' x ' + str(self.data[name]['scdata'].tsne.shape[1]) + ')', open=True)
+        self.plotTSNE()
         self.tsneOptions.destroy()
 
     def runDM(self):
