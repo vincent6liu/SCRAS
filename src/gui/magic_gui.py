@@ -316,7 +316,7 @@ class magic_gui(tk.Tk):
             self.tabs = []
 
         if file_type == 'csv':    # sc-seq data
-            scdata = magic.mg.SCData.from_csv(os.path.expanduser(self.dataFileName), data_type='sc-seq', 
+            scdata = magic.mg.SCData.from_csv(os.path.expanduser(self.dataFileName), data_type='sc-seq',
                                               cell_axis=self.rowVar.get(), delimiter=self.delimiter.get(),
                                               rows_after_header_to_skip=self.rowHeader.get(), 
                                               cols_after_header_to_skip=self.colHeader.get(),
@@ -697,6 +697,8 @@ class magic_gui(tk.Tk):
                                                                                                          row=0)
         self.phenoProgress.update()
 
+        self.data[name]['scdata'].log_transform_scseq_data()
+        self.data[name]['scdata'].run_tsne()
         communities, graph, Q = phenograph.cluster(self.data[name]['scdata'].data, k=self.nnnumVar.get(),
                                                    directed=self.directedVar.get(), prune=self.pruneVar.get(),
                                                    min_cluster_size=self.minsVar.get(),jaccard=self.jaccVar.get(),
@@ -704,20 +706,13 @@ class magic_gui(tk.Tk):
                                                    q_tol=self.toleVar.get(), louvain_time_limit=self.timeVar.get(),
                                                    nn_method=self.nnVar.get())
 
-        # self.data[name + ' MAGIC'] = {'scdata': self.data[name]['scdata'].magic, 'wb': None, 'state': tk.BooleanVar(),
-        #                              'genes': self.data[name]['scdata'].magic.data.columns.values, 'gates': {}}
-
-        # self.data_list.insert(self.curKey, 'end', text=name + ' MAGIC' +
-        #                                               ' (' + str(self.data[name]['scdata'].magic.data.shape[0]) +
-        #                                              ' x ' + str(self.data[name]['scdata'].magic.data.shape[1]) + ')',
-        #                      open=True)
-
         print(communities)
         print(graph)
         print(Q)
 
-        self.phenoProgress.destroy()
+        self.plotPheno(self.data[name]['scdata'], pd.Series(communities))
 
+        self.phenoProgress.destroy()
 
     def runTSNE(self):
         for key in self.data_list.selection():
@@ -983,6 +978,35 @@ class magic_gui(tk.Tk):
             tk.Button(self.tabs[len(self.tabs)-1][0], text="Save", command=self.savePlot).grid(row=0, column=5, sticky='NE')
             tk.Button(self.tabs[len(self.tabs)-1][0], text="Close tab", command=self.closeCurrentTab).grid(row=1, column=5, sticky='NE')
             self.currentPlot = 'tsne'
+
+    def plotPheno(self, scdata, col):
+        """
+        :param scdata: SCdata object
+        :param col: pd.Series object
+        """
+        self.fig = plt.figure(figsize=[6, 6])
+        gs = gridspec.GridSpec(1, 1)
+        self.ax = self.fig.add_subplot(gs[0, 0])
+        self.fig, self.ax = scdata.plot_tsne(fig=self.fig, ax=self.ax, color=col)
+        self.ax.set_title('PhenoGraph Clustering Result')
+        self.ax.set_xlabel('tSNE1')
+        self.ax.set_ylabel('tSNE2')
+
+        gs.tight_layout(self.fig)
+
+        self.tabs.append([tk.Frame(self.notebook), self.fig])
+        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text="test")
+
+        self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
+        self.canvas.show()
+        self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
+
+        tk.Button(self.tabs[len(self.tabs) - 1][0], text="Save", command=self.savePlot).grid(row=0, column=5,
+                                                                                             sticky='NE')
+        tk.Button(self.tabs[len(self.tabs) - 1][0], text="Close tab", command=self.closeCurrentTab).grid(row=1,
+                                                                                                         column=5,
+                                                                                                         sticky='NE')
+        self.currentPlot = 'tsne'
 
     def scatterPlot(self):
         keys = self.data_list.selection()
