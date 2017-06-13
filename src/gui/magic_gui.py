@@ -683,7 +683,6 @@ class magic_gui(tk.Tk):
                                                                                                   columnspan=2)
 
             tk.Button(self.phenoOptions, text="Cancel", command=self.phenoOptions.destroy).grid(column=0, row=9)
-            # to be implemented
             tk.Button(self.phenoOptions, text="Run", command=self._runPhenoGraph).grid(column=1, row=9)
             self.wait_window(self.phenoOptions)
 
@@ -692,27 +691,43 @@ class magic_gui(tk.Tk):
 
         self.phenoOptions.destroy()
         self.phenoProgress = tk.Toplevel()
+        self.msgVar = tk.StringVar()
+        self.msgVar.set("Running PhenoGraph - refer to console for progress updates.")
         self.phenoProgress.title(name + ': Running PhenoGraph')
         tk.Label(self.phenoProgress, text="Running PhenoGraph - refer to console for progress updates.").grid(column=0,
                                                                                                          row=0)
         self.phenoProgress.update()
 
+        print("log-transforming the data...")
         self.data[name]['scdata'].log_transform_scseq_data()
+
+        print("running tSNE...")
         self.data[name]['scdata'].run_tsne()
+
+        print("running PhenoGraph...")
         communities, graph, Q = phenograph.cluster(self.data[name]['scdata'].data, k=self.nnnumVar.get(),
                                                    directed=self.directedVar.get(), prune=self.pruneVar.get(),
-                                                   min_cluster_size=self.minsVar.get(),jaccard=self.jaccVar.get(),
+                                                   min_cluster_size=self.minsVar.get(), jaccard=self.jaccVar.get(),
                                                    primary_metric=self.choiceVar.get(), n_jobs=self.njobVar.get(),
                                                    q_tol=self.toleVar.get(), louvain_time_limit=self.timeVar.get(),
                                                    nn_method=self.nnVar.get())
 
-        print(communities)
-        print(graph)
-        print(Q)
+        numCluster = np.max(communities)
 
+        print("plotting data points...")
         self.plotPheno(self.data[name]['scdata'], pd.Series(communities))
-
         self.phenoProgress.destroy()
+
+        self.phenoResult = tk.Toplevel()
+        self.phenoResult.title(name + " PhenoGraph Results")
+        tk.Label(self.phenoResult, text=u"# of Clusters: " + str(numCluster), fg="black", bg="white").grid(column=0, row=1)
+        tk.Label(self.phenoResult, text=u"Modularity Score: " + str(Q), fg="black", bg="white").grid(column=0, row=2)
+        tk.Button(self.phenoResult, text="Ok", command=self.phenoResult.destroy).grid(column=0, row=3)
+        # to be implemented
+        tk.Button(self.phenoResult, text="Save Communities as CSV", command=None).grid(column=1, row=3)
+        self.phenoResult.update()
+        self.wait_window(self.phenoResult)
+
 
     def runTSNE(self):
         for key in self.data_list.selection():
