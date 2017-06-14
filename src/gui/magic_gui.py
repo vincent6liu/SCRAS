@@ -711,8 +711,8 @@ class magic_gui(tk.Tk):
                                                    primary_metric=self.choiceVar.get(), n_jobs=self.njobVar.get(),
                                                    q_tol=self.toleVar.get(), louvain_time_limit=self.timeVar.get(),
                                                    nn_method=self.nnVar.get())
+        numCluster = np.max(communities)+1
 
-        numCluster = np.max(communities)
 
         print("plotting data points...")
         self.plotPheno(self.data[name]['scdata'], pd.Series(communities))
@@ -727,7 +727,6 @@ class magic_gui(tk.Tk):
         tk.Button(self.phenoResult, text="Save Communities as CSV", command=None).grid(column=1, row=3)
         self.phenoResult.update()
         self.wait_window(self.phenoResult)
-
 
     def runTSNE(self):
         for key in self.data_list.selection():
@@ -999,6 +998,9 @@ class magic_gui(tk.Tk):
         :param scdata: SCdata object
         :param col: pd.Series object
         """
+        toPlot = scdata.tsne.assign(com=pd.Series(col).values)
+        clusterRec = {}
+
         self.fig = plt.figure(figsize=[6, 6])
         gs = gridspec.GridSpec(1, 1)
         self.ax = self.fig.add_subplot(gs[0, 0])
@@ -1006,6 +1008,20 @@ class magic_gui(tk.Tk):
         self.ax.set_title('PhenoGraph Clustering Result')
         self.ax.set_xlabel('tSNE1')
         self.ax.set_ylabel('tSNE2')
+
+        # position cluster number at cluster center
+        for index, row in toPlot.iterrows():
+            if row['com'] in clusterRec:
+                count = clusterRec[row['com']][2]
+                new1 = (clusterRec[row['com']][0] * count + row['tSNE1']) / (count + 1)
+                new2 = (clusterRec[row['com']][1] * count + row['tSNE2']) / (count + 1)
+                clusterRec[row['com']] = [new1, new2, count + 1]
+            else:
+                clusterRec[row['com']] = [row['tSNE1'], row['tSNE2'], 1]
+
+        for key in clusterRec:
+            x, y = clusterRec[key][0], clusterRec[key][1]
+            self.ax.annotate(str(int(key)+1), (x, y))
 
         gs.tight_layout(self.fig)
 
