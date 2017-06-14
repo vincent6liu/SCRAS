@@ -1021,7 +1021,7 @@ class magic_gui(tk.Tk):
 
         for key in clusterRec:
             x, y = clusterRec[key][0], clusterRec[key][1]
-            self.ax.annotate(str(int(key)+1), (x, y))
+            ax.annotate(str(int(key)), (x, y), fontsize=20, weight='bold', color='#777777')
 
         gs.tight_layout(self.fig)
 
