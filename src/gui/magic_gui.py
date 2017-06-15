@@ -21,6 +21,7 @@ import pickle
 import random
 import phenograph
 import time
+import csv
 
 class magic_gui(tk.Tk):
     def __init__(self,parent):
@@ -688,6 +689,7 @@ class magic_gui(tk.Tk):
 
     def _runPhenoGraph(self):
         name = self.data_list.item(self.curKey)['text'].split(' (')[0]
+        scdata = self.data[name]['scdata']
 
         self.phenoOptions.destroy()
         self.phenoProgress = tk.Toplevel()
@@ -699,23 +701,24 @@ class magic_gui(tk.Tk):
         self.phenoProgress.update()
 
         print("log-transforming the data...")
-        self.data[name]['scdata'].log_transform_scseq_data()
+        scdata.log_transform_scseq_data()
 
         print("running tSNE...")
-        self.data[name]['scdata'].run_tsne()
+        scdata.run_tsne()
 
         print("running PhenoGraph...")
-        communities, graph, Q = phenograph.cluster(self.data[name]['scdata'].data, k=self.nnnumVar.get(),
+        communities, graph, Q = phenograph.cluster(scdata.data, k=self.nnnumVar.get(),
                                                    directed=self.directedVar.get(), prune=self.pruneVar.get(),
                                                    min_cluster_size=self.minsVar.get(), jaccard=self.jaccVar.get(),
                                                    primary_metric=self.choiceVar.get(), n_jobs=self.njobVar.get(),
                                                    q_tol=self.toleVar.get(), louvain_time_limit=self.timeVar.get(),
                                                    nn_method=self.nnVar.get())
-        numCluster = np.max(communities)+1
+        numCluster = np.max(communities)
+        communities = [str(int(i)) for i in communities]
 
 
         print("plotting data points...")
-        self.plotPheno(self.data[name]['scdata'], pd.Series(communities))
+        self.plotPheno(scdata, pd.Series(communities))
         self.phenoProgress.destroy()
 
         self.phenoResult = tk.Toplevel()
@@ -724,7 +727,8 @@ class magic_gui(tk.Tk):
         tk.Label(self.phenoResult, text=u"Modularity Score: " + str(Q), fg="black", bg="white").grid(column=0, row=2)
         tk.Button(self.phenoResult, text="Ok", command=self.phenoResult.destroy).grid(column=0, row=3)
         # to be implemented
-        tk.Button(self.phenoResult, text="Save Communities as CSV", command=None).grid(column=1, row=3)
+        tk.Button(self.phenoResult, text="Save Communities as CSV",
+                  command=lambda: self.saveCSV(scdata, pd.Series(communities))).grid(column=1, row=3)
         self.phenoResult.update()
         self.wait_window(self.phenoResult)
 
@@ -1021,7 +1025,7 @@ class magic_gui(tk.Tk):
 
         for key in clusterRec:
             x, y = clusterRec[key][0], clusterRec[key][1]
-            ax.annotate(str(int(key)), (x, y), fontsize=20, weight='bold', color='#777777')
+            self.ax.annotate(str(int(key)), (x, y), fontsize=20, weight='bold', color='#777777')
 
         gs.tight_layout(self.fig)
 
@@ -1190,6 +1194,30 @@ class magic_gui(tk.Tk):
                                                          initialfile=default_name)
         if self.plotFileName != None:
             self.tabs[tab][1].savefig(self.plotFileName)
+
+    def saveCSV(self, scdata, col):
+        toSave = scdata.tsne.assign(com=pd.Series(col).values)
+        self.csvFile = filedialog.asksaveasfile(title='Save as CSV', defaultextension='.csv', mode='w')
+
+        if self.csvFile:
+            clusters = []
+            cell_map = {}
+            for index, row in toSave.iterrows():
+                if row['com'] in clusters:
+                    cell_map[row['com']].append(index)
+                else:
+                    clusters.append(row['com'])
+                    cell_map[row['com']] = [index]
+
+            clusters = sorted(clusters)
+
+        writer = csv.writer(self.csvFile, delimiter=',')
+        writer.writerow(clusters)
+        for clus in clusters:
+            writer.writerow(cell_map[clus])
+
+        self.csvFile.close()
+
 
     def closeCurrentTab(self):
         tab = self.notebook.index(self.notebook.select())
