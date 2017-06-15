@@ -44,6 +44,7 @@ class magic_gui(tk.Tk):
         self.fileMenu.add_command(label="Load 10x file", command=self.load10x)
         self.fileMenu.add_command(label="Load saved session from pickle file", command=self.loadPickle)
         self.fileMenu.add_command(label="Save data", state='disabled', command=self.saveData)
+        self.fileMenu.add_command(label="Save plot", state='disabled', command=self.savePlot)
         self.fileMenu.add_command(label="Exit", command=self.quitMAGIC)
 
         self.analysisMenu = tk.Menu(self.menubar, tearoff=0)
@@ -528,8 +529,8 @@ class magic_gui(tk.Tk):
             # plot component-variance plot with the input number of components
             self.fig = plt.figure(figsize=[6, 6])
             self.fig, self.ax = self.data[curKey]['scdata'].plot_pca_variance_explained(n_components=self.nComponents.get(),
-                                                                                      fig=self.fig,
-                                                                                      random=self.randomVar.get())
+                                                                                        fig=self.fig,
+                                                                                        random=self.randomVar.get())
 
             self.tabs.append([tk.Frame(self.notebook), self.fig])
             self.notebook.add(self.tabs[len(self.tabs) - 1][0], text='PCA plot')
@@ -538,11 +539,8 @@ class magic_gui(tk.Tk):
             self.canvas.show()
             self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
-            tk.Button(self.tabs[len(self.tabs) - 1][0], text="Save", command=self.savePlot).grid(row=0, column=5,
-                                                                                                 sticky='NE')
-            tk.Button(self.tabs[len(self.tabs) - 1][0], text="Close tab", command=self.closeCurrentTab).grid(row=1,
-                                                                                                             column=5,
-                                                                                                             sticky='NE')
+            self.fileMenu.entryconfig(5, state='normal')
+
             self.currentPlot = 'pca'
             self.pcaOptions.destroy()
         # self.visMenu.entryconfig(1, state='normal')
@@ -936,10 +934,9 @@ class magic_gui(tk.Tk):
 
             self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs)-1][0])
             self.canvas.show()
-            self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW') 
+            self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
-            tk.Button(self.tabs[len(self.tabs)-1][0], text="Save", command=self.savePlot).grid(row=0, column=5, sticky='NE')
-            tk.Button(self.tabs[len(self.tabs)-1][0], text="Close tab", command=self.closeCurrentTab).grid(row=1, column=5, sticky='NE')
+            self.fileMenu.entryconfig(5, state='normal')
 
             if len(components) == 3:
                 for ax in self.ax:
@@ -991,10 +988,10 @@ class magic_gui(tk.Tk):
 
             self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs)-1][0])
             self.canvas.show()
-            self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW') 
+            self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
-            tk.Button(self.tabs[len(self.tabs)-1][0], text="Save", command=self.savePlot).grid(row=0, column=5, sticky='NE')
-            tk.Button(self.tabs[len(self.tabs)-1][0], text="Close tab", command=self.closeCurrentTab).grid(row=1, column=5, sticky='NE')
+            self.fileMenu.entryconfig(5, state='normal')
+
             self.currentPlot = 'tsne'
 
     def plotPheno(self, scdata, col):
@@ -1002,6 +999,7 @@ class magic_gui(tk.Tk):
         :param scdata: SCdata object
         :param col: pd.Series object
         """
+        name = self.data_list.item(self.curKey)['text'].split(' (')[0]
         toPlot = scdata.tsne.assign(com=pd.Series(col).values)
         clusterRec = {}
 
@@ -1030,17 +1028,14 @@ class magic_gui(tk.Tk):
         gs.tight_layout(self.fig)
 
         self.tabs.append([tk.Frame(self.notebook), self.fig])
-        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text="test")
+        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text=name)
 
         self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
         self.canvas.show()
         self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
-        tk.Button(self.tabs[len(self.tabs) - 1][0], text="Save", command=self.savePlot).grid(row=0, column=5,
-                                                                                             sticky='NE')
-        tk.Button(self.tabs[len(self.tabs) - 1][0], text="Close tab", command=self.closeCurrentTab).grid(row=1,
-                                                                                                         column=5,
-                                                                                                         sticky='NE')
+        self.fileMenu.entryconfig(5, state='normal')
+
         self.currentPlot = 'tsne'
 
     def scatterPlot(self):
@@ -1106,10 +1101,9 @@ class magic_gui(tk.Tk):
 
                 self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs)-1][0])
                 self.canvas.show()
-                self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW') 
+                self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
-                tk.Button(self.tabs[len(self.tabs)-1][0], text="Save", command=self.savePlot).grid(row=0, column=5, sticky='NE')
-                tk.Button(self.tabs[len(self.tabs)-1][0], text="Close tab", command=self.closeCurrentTab).grid(row=1, column=5, sticky='NE')
+                self.fileMenu.entryconfig(5, state='normal')
 
                 if len(zSelection[0]) > 0 and len(zSelection) == len(xSelection):
                         for ax in self.ax:
@@ -1217,7 +1211,6 @@ class magic_gui(tk.Tk):
             writer.writerow(cell_map[clus])
 
         self.csvFile.close()
-
 
     def closeCurrentTab(self):
         tab = self.notebook.index(self.notebook.select())
