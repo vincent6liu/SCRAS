@@ -45,6 +45,7 @@ class magic_gui(tk.Tk):
         self.fileMenu.add_command(label="Load saved session from pickle file", command=self.loadPickle)
         self.fileMenu.add_command(label="Save data", state='disabled', command=self.saveData)
         self.fileMenu.add_command(label="Save plot", state='disabled', command=self.savePlot)
+        self.fileMenu.add_command(label="Concatenate datasets", state='disabled', command=self.concatenateData)
         self.fileMenu.add_command(label="Exit", command=self.quitMAGIC)
 
         self.analysisMenu = tk.Menu(self.menubar, tearoff=0)
@@ -308,7 +309,7 @@ class magic_gui(tk.Tk):
 
             self.data_detail = ttk.Treeview()
             self.data_detail.heading('#0', text='Features')
-            self.data_detail.grid(column=0, row=5, rowspan=5, sticky='NSEW')
+            self.data_detail.grid(column=0, row=5, rowspan=7, sticky='NSEW')
             ysb2 = ttk.Scrollbar(orient=tk.VERTICAL, command=self.data_detail.yview)
             xsb2 = ttk.Scrollbar(orient=tk.HORIZONTAL, command=self.data_detail.xview)
             self.data_detail.configure(yscroll=ysb2.set, xscroll=xsb2.set)
@@ -360,12 +361,12 @@ class magic_gui(tk.Tk):
         self.visMenu.entryconfig(0, state='normal')
         self.visMenu.entryconfig(1, state='normal')
         self.visMenu.entryconfig(2, state='normal')
-        self.concatButton = tk.Button(self, text=u"Concatenate selected datasets", state='disabled', wraplength=80, command=self.concatenateData)
-        self.concatButton.grid(column=0, row=11)
+        # self.concatButton = tk.Button(self, text=u"Concatenate selected datasets", state='disabled', wraplength=80, command=self.concatenateData)
+        # self.concatButton.grid(column=0, row=11)
         if len(self.data) > 1:
-            self.concatButton.config(state='normal')
+            self.fileMenu.entryconfig(6, state='normal')
 
-        self.geometry('1000x700')
+        self.geometry('1000x650')
         #destroy pop up menu
         self.fileInfo.destroy()
 
