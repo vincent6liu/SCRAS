@@ -1100,18 +1100,18 @@ class SCData:
         #concatenate dataframes
         temp = self.data.copy()
         if axis == 0:
-            temp.index = [names[0] + ' ' + i for i in self.data.index]
+            temp.index = [str(names[0]) + ' ' + str(i) for i in self.data.index]
         else:
-            temp.columns = [names[0] + ' ' + i for i in self.data.columns]
+            temp.columns = [str(names[0]) + ' ' + str(i) for i in self.data.columns]
         dfs = [temp]
         count = 0
         for data_set in other_data_sets:
             count += 1
             temp = data_set.data.copy()
             if axis == 0:
-                temp.index = [names[count] + ' ' + i for i in data_set.data.index]
+                temp.index = [str(names[count]) + ' ' + str(i) for i in data_set.data.index]
             else:
-                temp.columns = [names[count] + ' ' + i for i in self.data.columns]
+                temp.columns = [str(names[count]) + ' ' + str(i) for i in self.data.columns]
             dfs.append(temp)
         df_concat = pd.concat(dfs, join=join, axis=axis)
 
