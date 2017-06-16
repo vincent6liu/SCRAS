@@ -575,7 +575,7 @@ class SCData:
         fig, ax = get_fig(fig=fig, ax=ax)
         if isinstance(color, pd.Series):
             plt.scatter(self.tsne['tSNE1'], self.tsne['tSNE2'], s=size,
-                        c=color.values, edgecolors='none')
+                        c=color.values, edgecolors='none', cmap='hsv')
             # plt.colorbar()
         elif density == True:
             # Calculate the point density
