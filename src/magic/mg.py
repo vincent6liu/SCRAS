@@ -574,9 +574,9 @@ class SCData:
             raise RuntimeError('Please run tSNE using run_tsne before plotting ')
         fig, ax = get_fig(fig=fig, ax=ax)
         if isinstance(color, pd.Series):
-            plt.scatter(self.tsne['tSNE1'], self.tsne['tSNE2'], s=size, 
+            plt.scatter(self.tsne['tSNE1'], self.tsne['tSNE2'], s=size,
                         c=color.values, edgecolors='none')
-            plt.colorbar()
+            # plt.colorbar()
         elif density == True:
             # Calculate the point density
             xy = np.vstack([self.tsne['tSNE1'], self.tsne['tSNE2']])
