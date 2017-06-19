@@ -8,13 +8,13 @@ if sys.version_info.major != 3:
     raise RuntimeError('Magic requires Python 3')
 
 
-setup(name='magic',
+setup(name='phenoGUI',
       version='0.0',
-      description='MAGIC',
+      description='GUI integrating magic and phenograph',
       author='',
       author_email='',
       package_dir={'': 'src'},
-      packages=['magic'],
+      packages=['magic', 'phenoraph'],
       install_requires=[
           'numpy>=1.10.0',
           'pandas>=0.18.0',
@@ -26,7 +26,7 @@ setup(name='magic',
           'fcsparser',
           'statsmodels',
       ],
-      scripts=['src/magic/magic_gui.py'],
+      scripts=['src/gui/magic_gui.py'],
       )
 
 
