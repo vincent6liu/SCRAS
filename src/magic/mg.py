@@ -21,9 +21,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import Axes3D
+
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')  # catch experimental ipython widget warning
     import seaborn as sns
+from matplotlib.font_manager import FontProperties
 
 # from tsne import bh_sne
 from sklearn.manifold import TSNE
@@ -48,7 +50,7 @@ with warnings.catch_warnings():
     sns.set(context="paper", style='ticks', font_scale=1.5, font='Bitstream Vera Sans')
 
 matplotlib.rcParams['image.cmap'] = 'viridis'
-size = 8
+size = 12
 
 
 def qualitative_colors(n):
@@ -69,6 +71,7 @@ def get_fig(fig=None, ax=None, figsize=[6.5, 6.5]):
         ax = plt.gca()
     return fig, ax
 
+
 def density_2d(x, y):
     """return x and y and their density z, sorted by their density (smallest to largest)
 
@@ -81,9 +84,8 @@ def density_2d(x, y):
     i = np.argsort(z)
     return np.ravel(x)[i], np.ravel(y)[i], np.arcsinh(z[i])
 
-        
-class SCData:
 
+class SCData:
     def __init__(self, data, data_type='sc-seq', metadata=None):
         """
         Container class for single cell data
@@ -161,7 +163,7 @@ class SCData:
         cols = [np.array(['data' for i in range(item.shape[1])]), np.array(item.columns.values)]
         self._data = pd.DataFrame(item.values, index=item.index, columns=cols)
 
-    @property 
+    @property
     def extended_data(self):
         return self._data
 
@@ -198,7 +200,6 @@ class SCData:
             item.columns = [np.array(['PCA' for i in range(item.shape[1])]), item.columns.values]
             self._data = pd.concat([self._data, item], axis=1)
             self._pca = True
-
 
     @property
     def tsne(self):
@@ -276,72 +277,69 @@ class SCData:
         if not (isinstance(item, pd.Series) or item is None):
             raise TypeError('self.library_sizes must be a pd.Series object')
 
-
     @classmethod
-    def from_csv(cls, counts_csv_file, data_type='sc-seq', cell_axis=0, delimiter=',', 
+    def from_csv(cls, counts_csv_file, data_type='sc-seq', cell_axis=0, delimiter=',',
                  rows_after_header_to_skip=0, cols_after_header_to_skip=0, normalize=True):
 
         if not data_type in ['sc-seq', 'masscyt']:
             raise RuntimeError('data_type must be either sc-seq or masscyt')
 
         # Read in csv file
-        df = pd.DataFrame.from_csv( counts_csv_file, sep=delimiter)
+        df = pd.DataFrame.from_csv(counts_csv_file, sep=delimiter)
 
-        df.drop(df.index[1:rows_after_header_to_skip+1], axis=0, inplace=True)
-        df.drop(df.columns[1:cols_after_header_to_skip+1],axis=1, inplace=True)
-        
+        df.drop(df.index[1:rows_after_header_to_skip + 1], axis=0, inplace=True)
+        df.drop(df.columns[1:cols_after_header_to_skip + 1], axis=1, inplace=True)
+
         if cell_axis != 0:
             df = df.transpose()
-            
+
         # Construct class object
-        scdata = cls( df, data_type=data_type )
+        scdata = cls(df, data_type=data_type)
 
         # Normalize if specified
-        if normalize==True:
-            scdata = scdata.normalize_scseq_data( )
+        if normalize == True:
+            scdata = scdata.normalize_scseq_data()
 
         return scdata
 
-
     @classmethod
-    def from_fcs(cls, fcs_file, cofactor=5, 
-        metadata_channels=['Time', 'Event_length', 'DNA1', 'DNA2', 'Cisplatin', 'beadDist', 'bead1']):
+    def from_fcs(cls, fcs_file, cofactor=5,
+                 metadata_channels=['Time', 'Event_length', 'DNA1', 'DNA2', 'Cisplatin', 'beadDist', 'bead1']):
 
         # Parse the fcs file
-        text, data = fcsparser.parse( fcs_file )
+        text, data = fcsparser.parse(fcs_file)
         data = data.astype(np.float64)
 
         # Extract the S and N features (Indexing assumed to start from 1)
         # Assumes channel names are in S
         no_channels = text['$PAR']
         channel_names = [''] * no_channels
-        for i in range(1, no_channels+1):
+        for i in range(1, no_channels + 1):
             # S name
             try:
                 channel_names[i - 1] = text['$P%dS' % i]
             except KeyError:
                 channel_names[i - 1] = text['$P%dN' % i]
         data.columns = channel_names
-        
-        # Metadata and data 
+
+        # Metadata and data
         metadata_channels = data.columns.intersection(metadata_channels)
-        data_channels = data.columns.difference( metadata_channels )
+        data_channels = data.columns.difference(metadata_channels)
         metadata = data[metadata_channels]
         data = data[data_channels]
 
         # Transform if necessary
         if cofactor is not None or cofactor > 0:
-            data = np.arcsinh(np.divide( data, cofactor ))
+            data = np.arcsinh(np.divide(data, cofactor))
 
         # Create and return scdata object
         scdata = cls(data, 'masscyt', metadata)
         return scdata
 
-
     @classmethod
     def from_mtx(cls, mtx_file, gene_name_file, normalize=True):
 
-        #Read in mtx file
+        # Read in mtx file
         count_matrix = mmread(mtx_file)
 
         gene_names = np.loadtxt(gene_name_file, dtype=np.dtype('S'))
@@ -351,69 +349,68 @@ class SCData:
         df = pd.DataFrame(count_matrix.todense(), columns=gene_names)
 
         # Construct class object
-        scdata = cls( df, data_type='sc-seq' )
+        scdata = cls(df, data_type='sc-seq')
 
         # Normalize if specified
-        if normalize==True:
-            scdata = scdata.normalize_scseq_data( )
+        if normalize == True:
+            scdata = scdata.normalize_scseq_data()
 
         return scdata
 
     @classmethod
     def from_10x(cls, data_dir, use_ensemble_id=True, normalize=True):
-        #loads 10x sparse format data
-        #data_dir is dir that contains matrix.mtx, genes.tsv and barcodes.tsv
-        #return_sparse=True -- returns data matrix in sparse format (default = False)
+        # loads 10x sparse format data
+        # data_dir is dir that contains matrix.mtx, genes.tsv and barcodes.tsv
+        # return_sparse=True -- returns data matrix in sparse format (default = False)
 
-        if data_dir==None or len(data_dir)==0:
+        if data_dir == None or len(data_dir) == 0:
             data_dir = './'
-        elif data_dir[len(data_dir)-1] != '/':
+        elif data_dir[len(data_dir) - 1] != '/':
             data_dir = data_dir + '/'
 
         filename_dataMatrix = os.path.expanduser(data_dir + 'matrix.mtx')
         filename_genes = os.path.expanduser(data_dir + 'genes.tsv')
         filename_cells = os.path.expanduser(data_dir + 'barcodes.tsv')
 
-
-        #Read in gene expression matrix (sparse matrix)
-        #Rows = genes, columns = cells
+        # Read in gene expression matrix (sparse matrix)
+        # Rows = genes, columns = cells
         print('LOADING')
         dataMatrix = mmread(filename_dataMatrix);
 
-        #Read in row names (gene names / IDs)
+        # Read in row names (gene names / IDs)
         gene_names = np.loadtxt(filename_genes, delimiter='\t', dtype=bytes).astype(str)
-        if use_ensemble_id==True:
+        if use_ensemble_id == True:
             gene_names = [gene[0] for gene in gene_names]
         else:
             gene_names = [gene[1] for gene in gene_names]
         cell_names = np.loadtxt(filename_cells, delimiter='\t', dtype=bytes).astype(str)
-   
+
         dataMatrix = pd.DataFrame(dataMatrix.todense(), columns=cell_names, index=gene_names)
 
-        #combine duplicate genes
+        # combine duplicate genes
         if use_ensemble_id == False:
             dataMatrix = dataMatrix.groupby(dataMatrix.index).sum()
 
         dataMatrix = dataMatrix.transpose()
 
-        #Remove empty cells
+        # Remove empty cells
         print('Removing empty cells')
         cell_sums = dataMatrix.sum(axis=1)
         to_keep = np.where(cell_sums > 0)[0]
         dataMatrix = dataMatrix.ix[dataMatrix.index[to_keep], :].astype(np.float32)
 
-        #Remove empty genes
+        # Remove empty genes
         print('Removing empty genes')
         gene_sums = dataMatrix.sum(axis=0)
         to_keep = np.where(gene_sums > 0)[0]
         dataMatrix = dataMatrix.ix[:, to_keep].astype(np.float32)
 
         # Construct class object
-        scdata = cls( dataMatrix, data_type='sc-seq' )
+        scdata = cls(dataMatrix, data_type='sc-seq')
 
         # Normalize if specified
-        if normalize==True:
-            scdata = scdata.normalize_scseq_data( )
+        if normalize == True:
+            scdata = scdata.normalize_scseq_data()
 
         return scdata
 
@@ -421,7 +418,7 @@ class SCData:
 
         if filter_cell_min != filter_cell_max:
             sums = self.data.sum(axis=1)
-            to_keep = np.intersect1d(np.where(sums >= filter_cell_min)[0], 
+            to_keep = np.intersect1d(np.where(sums >= filter_cell_min)[0],
                                      np.where(sums <= filter_cell_max)[0])
             self.data = self.data.ix[self.data.index[to_keep], :].astype(np.float32)
 
@@ -435,16 +432,15 @@ class SCData:
             to_keep = np.where(sums >= filter_gene_mols)[0]
             self.data = self.data.ix[:, to_keep].astype(np.float32)
 
-
     def normalize_scseq_data(self):
         """
-        Normalize single cell RNA-seq data: Divide each cell by its molecule count 
+        Normalize single cell RNA-seq data: Divide each cell by its molecule count
         and multiply counts of cells by the median of the molecule counts
         :return: SCData
         """
 
         molecule_counts = self.data.sum(axis=1)
-        data = self.data.div(molecule_counts, axis=0)\
+        data = self.data.div(molecule_counts, axis=0) \
             .mul(np.median(molecule_counts), axis=0)
         scdata = SCData(data=data, metadata=self.metadata)
         scdata._normalized = True
@@ -459,10 +455,9 @@ class SCData:
 
         return scdata
 
-
     def log_transform_scseq_data(self, pseudocount=0.1):
         self.data = np.log(np.add(self.data, pseudocount))
-        
+
     def plot_molecules_per_cell_and_gene(self, fig=None, ax=None):
 
         height = 4
@@ -484,7 +479,7 @@ class SCData:
                 n, bins, patches = ax.hist(temp, bins='auto')
                 plt.xlabel('Nonzero cells per gene (log10 scale)')
             else:
-                n, bins, patches = ax.hist(colsum, bins='auto') 
+                n, bins, patches = ax.hist(colsum, bins='auto')
                 plt.xlabel('Molecules per gene (log10 scale)')
             plt.ylabel('Frequency')
             plt.tight_layout()
@@ -492,24 +487,22 @@ class SCData:
 
         return fig, ax
 
-
     def run_pca(self, n_components=100, random=True):
         """
-        Principal component analysis of the data. 
+        Principal component analysis of the data.
         :param n_components: Number of components to project the data
         """
-        
+
         solver = 'randomized'
         if random != True:
             solver = 'full'
 
         pca = PCA(n_components=n_components, svd_solver=solver)
         self.pca = pd.DataFrame(data=pca.fit_transform(self.data.values), index=self.data.index,
-                                columns=['PC' + str(i) for i in range(1, n_components+1)])
-
+                                columns=['PC' + str(i) for i in range(1, n_components + 1)])
 
     def plot_pca_variance_explained(self, n_components=30,
-            fig=None, ax=None, ylim=(0, 100), random=True):
+                                    fig=None, ax=None, ylim=(0, 100), random=True):
         """ Plot the variance explained by different principal components
         :param n_components: Number of components to show the variance
         :param ylim: y-axis limits
@@ -533,11 +526,10 @@ class SCData:
         plt.title('Principal components')
         return fig, ax
 
-
     def run_tsne(self, n_components=50, perplexity=30, n_iter=1000, theta=0.5):
         """ Run tSNE on the data. tSNE is run on the principal component projections
         for single cell RNA-seq data and on the expression matrix for mass cytometry data
-        :param n_components: Number of components to use for running tSNE for single cell 
+        :param n_components: Number of components to use for running tSNE for single cell
         RNA-seq data. Ignored for mass cytometry
         :return: None
         """
@@ -559,10 +551,10 @@ class SCData:
         perplexity_limit = 15
         if data.shape[0] < 100 and perplexity > perplexity_limit:
             print('Reducing perplexity to %d since there are <100 cells in the dataset. ' % perplexity_limit)
-        tsne = TSNE(n_components=2, perplexity=perplexity, init='random', random_state=sum(data.shape), n_iter=n_iter, angle=theta) 
-        self.tsne = pd.DataFrame(tsne.fit_transform(data),                       
-								 index=self.data.index, columns=['tSNE1', 'tSNE2'])
-
+        tsne = TSNE(n_components=2, perplexity=perplexity, init='random', random_state=sum(data.shape), n_iter=n_iter,
+                    angle=theta)
+        self.tsne = pd.DataFrame(tsne.fit_transform(data),
+                                 index=self.data.index, columns=['tSNE1', 'tSNE2'])
 
     def plot_tsne(self, fig=None, ax=None, density=False, color=None, title='tSNE projection'):
         """Plot tSNE projections of the data
@@ -570,14 +562,20 @@ class SCData:
         :param ax: matplotlib Axis object
         :param title: Title for the plot
         """
+        fontP = FontProperties()
+        fontP.set_size('xx-small')
         if self.tsne is None:
             raise RuntimeError('Please run tSNE using run_tsne before plotting ')
         fig, ax = get_fig(fig=fig, ax=ax)
         if isinstance(color, pd.Series):
-            plt.scatter(self.tsne['tSNE1'], self.tsne['tSNE2'], s=size,
-                        c=color.values, edgecolors='none', cmap='hsv')
+            sc = plt.scatter(self.tsne['tSNE1'], self.tsne['tSNE2'], s=size,
+                             c=color.values, edgecolors='none', cmap='rainbow')
+            lp = lambda i: plt.plot([], color=sc.cmap(sc.norm(i)), ms=np.sqrt(size), mec="none",
+                                    label="Cluster {:g}".format(i), ls="", marker="o")[0]
+            handles = [lp(int(i)) for i in np.unique(color)]
+            plt.legend(handles=handles, prop=fontP, loc='upper right').set_frame_on(True)
             # plt.colorbar()
-        elif density == True:
+        elif density:
             # Calculate the point density
             xy = np.vstack([self.tsne['tSNE1'], self.tsne['tSNE2']])
             z = gaussian_kde(xy)(xy)
@@ -591,24 +589,23 @@ class SCData:
         else:
             plt.scatter(self.tsne['tSNE1'], self.tsne['tSNE2'], s=size, edgecolors='none',
                         color=qualitative_colors(2)[1] if color == None else color)
-        
+
         ax.set_title(title)
         plt.axis('tight')
         plt.tight_layout()
         return fig, ax
 
-
     def plot_tsne_by_cell_sizes(self, fig=None, ax=None, vmin=None, vmax=None):
         """Plot tSNE projections of the data with cells colored by molecule counts
         :param fig: matplotlib Figure object
         :param ax: matplotlib Axis object
-        :param vmin: Minimum molecule count for plotting 
-        :param vmax: Maximum molecule count for plotting 
+        :param vmin: Minimum molecule count for plotting
+        :param vmax: Maximum molecule count for plotting
         :param title: Title for the plot
         """
         if self.data_type == 'masscyt':
-            raise RuntimeError( 'plot_tsne_by_cell_sizes is not applicable \n\
-                for mass cytometry data. ' )
+            raise RuntimeError('plot_tsne_by_cell_sizes is not applicable \n\
+                for mass cytometry data. ')
 
         fig, ax = get_fig(fig, ax)
         if self.tsne is None:
@@ -623,15 +620,14 @@ class SCData:
         plt.tight_layout()
         return fig, ax
 
-
     def run_diffusion_map(self, k=10, epsilon=1, distance_metric='euclidean',
-        n_diffusion_components=10, n_pca_components=15, markers=None, ka=0, random_pca=True):
+                          n_diffusion_components=10, n_pca_components=15, markers=None, ka=0, random_pca=True):
         """ Run diffusion maps on the data. Run on the principal component projections
         for single cell RNA-seq data and on the expression matrix for mass cytometry data
         :param k: Number of neighbors for graph construction to determine distances between cells
         :param epsilon: Gaussian standard deviation for converting distances to affinities
         :param n_diffusion_components: Number of diffusion components to Generalte
-        :param n_pca_components: Number of components to use for running tSNE for single cell 
+        :param n_pca_components: Number of components to use for running tSNE for single cell
         RNA-seq data. Ignored for mass cytometry
         :return: None
         """
@@ -672,9 +668,9 @@ class SCData:
             dists[inds] = distances[i, :]
             location += k
         if epsilon > 0:
-            W = csr_matrix( (dists, (rows, cols)), shape=[N, N] )
+            W = csr_matrix((dists, (rows, cols)), shape=[N, N])
         else:
-            W = csr_matrix( (np.ones(dists.shape), (rows, cols)), shape=[N, N] )
+            W = csr_matrix((np.ones(dists.shape), (rows, cols)), shape=[N, N])
 
         # Symmetrize W
         W = W + W.T
@@ -684,16 +680,16 @@ class SCData:
             rows, cols, dists = find(W)
             rows = np.append(rows, range(N))
             cols = np.append(cols, range(N))
-            dists = np.append(dists/(epsilon ** 2), np.zeros(N))
-            W = csr_matrix( (np.exp(-dists), (rows, cols)), shape=[N, N] )
+            dists = np.append(dists / (epsilon ** 2), np.zeros(N))
+            W = csr_matrix((np.exp(-dists), (rows, cols)), shape=[N, N])
 
         # Create D
-        D = np.ravel(W.sum(axis = 1))
-        D[D!=0] = 1/D[D!=0]
+        D = np.ravel(W.sum(axis=1))
+        D[D != 0] = 1 / D[D != 0]
 
-        #markov normalization
+        # markov normalization
         T = csr_matrix((D, (range(N), range(N))), shape=[N, N]).dot(W)
-        
+
         # Eigen value decomposition
         D, V = eigs(T, n_diffusion_components, tol=1e-4, maxiter=1000)
         D = np.real(D)
@@ -710,9 +706,8 @@ class SCData:
 
         # Update object
         self.diffusion_eigenvectors = pd.DataFrame(V, index=self.data.index,
-                                                   columns=['DC'+str(i) for i in range(n_diffusion_components)])
+                                                   columns=['DC' + str(i) for i in range(n_diffusion_components)])
         self.diffusion_eigenvalues = pd.DataFrame(D)
-
 
     def plot_diffusion_components(self, other_data=None, title='Diffusion Components'):
         """ Plots the diffusion components on tSNE maps
@@ -739,21 +734,21 @@ class SCData:
             plt.scatter(self.tsne['tSNE1'], self.tsne['tSNE2'], c=self.diffusion_eigenvectors[i],
                         edgecolors='none', s=size)
 
-            plt.title( 'Component %d' % i, fontsize=10 )
+            plt.title('Component %d' % i, fontsize=10)
 
         if other_data:
             for i in range(other_data.diffusion_eigenvectors.shape[1]):
-                ax = plt.subplot(gs[(self.diffusion_eigenvectors.shape[1] + i) // n_cols, (self.diffusion_eigenvectors.shape[1] + i) % n_cols])
+                ax = plt.subplot(gs[(self.diffusion_eigenvectors.shape[1] + i) // n_cols, (
+                self.diffusion_eigenvectors.shape[1] + i) % n_cols])
 
                 plt.scatter(other_data.tsne['tSNE1'], other_data.tsne['tSNE2'], c=other_data.diffusion_eigenvectors[i],
                             edgecolors='none', s=size)
 
-                plt.title( 'Component %d' % i, fontsize=10 )
+                plt.title('Component %d' % i, fontsize=10)
 
         gs.tight_layout(fig)
         # fig.suptitle(title, fontsize=12)
         return fig, ax
-
 
     def plot_diffusion_eigen_vectors(self, fig=None, ax=None, title='Diffusion eigen vectors'):
         """ Plots the eigen values associated with diffusion components
@@ -764,15 +759,14 @@ class SCData:
 
         fig, ax = get_fig(fig=fig, ax=ax)
         ax.plot(np.ravel(self.diffusion_eigenvalues.values))
-        plt.scatter( range(len(self.diffusion_eigenvalues)), 
-            self._diffusion_eigenvalues, s=20, edgecolors='none', color='red' )
-        plt.xlabel( 'Diffusion components')
+        plt.scatter(range(len(self.diffusion_eigenvalues)),
+                    self._diffusion_eigenvalues, s=20, edgecolors='none', color='red')
+        plt.xlabel('Diffusion components')
         plt.ylabel('Eigen values')
-        plt.title( title )
-        plt.xlim([ -0.1, len(self.diffusion_eigenvalues) - 0.9])
+        plt.title(title)
+        plt.xlim([-0.1, len(self.diffusion_eigenvalues) - 0.9])
         sns.despine(ax=ax)
         return fig, ax
-
 
     @staticmethod
     def _correlation(x: np.array, vals: np.array):
@@ -783,7 +777,6 @@ class SCData:
         sigma_vals = vals.std(axis=0)
 
         return ((vals * x).mean(axis=0) - mu_vals * mu_x) / (sigma_vals * sigma_x)
-
 
     def run_diffusion_map_correlations(self, components=None, no_cells=10):
         """ Determine gene expression correlations along diffusion components
@@ -806,7 +799,7 @@ class SCData:
         # Container
         diffusion_map_correlations = np.empty((self.data.shape[1],
                                                self.diffusion_eigenvectors.shape[1]),
-                                               dtype=np.float)
+                                              dtype=np.float)
         for component_index in components:
             component_data = self.diffusion_eigenvectors.ix[:, component_index]
 
@@ -823,8 +816,7 @@ class SCData:
 
         # this is sorted by order, need it in original order (reverse the sort)
         self.diffusion_map_correlations = pd.DataFrame(diffusion_map_correlations[:, components],
-                            index=self.data.columns, columns=components)
-
+                                                       index=self.data.columns, columns=components)
 
     def plot_gene_component_correlations(
             self, components=None, fig=None, ax=None,
@@ -846,7 +838,7 @@ class SCData:
             components = self.diffusion_map_correlations.columns
         colors = qualitative_colors(len(components))
 
-        for c,color in zip(components, colors):
+        for c, color in zip(components, colors):
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore')  # catch experimental ipython widget warning
                 sns.kdeplot(self.diffusion_map_correlations[c].fillna(0), label=c,
@@ -858,11 +850,10 @@ class SCData:
         plt.legend()
         return fig, ax
 
-
     # todo add option to plot phenograph cluster that these are being DE in.
     def plot_gene_expression(self, genes, other_data=None):
         """ Plot gene expression on tSNE maps
-        :param genes: Iterable of strings to plot on tSNE        
+        :param genes: Iterable of strings to plot on tSNE
         """
         if not isinstance(genes, dict):
             not_in_dataframe = set(genes).difference(self.extended_data.columns.get_level_values(1))
@@ -880,16 +871,18 @@ class SCData:
         n_rows = int(height / 5)
         n_cols = 2
         if other_data:
-            fig = plt.figure(figsize=[width, 2*(height+0.25)])
-            gs = plt.GridSpec(2*n_rows, n_cols)
+            fig = plt.figure(figsize=[width, 2 * (height + 0.25)])
+            gs = plt.GridSpec(2 * n_rows, n_cols)
         else:
-            fig = plt.figure(figsize=[width, height+0.25])
+            fig = plt.figure(figsize=[width, height + 0.25])
             gs = plt.GridSpec(n_rows, n_cols)
 
         axes = []
         for i, g in enumerate(genes):
             if not isinstance(genes, dict):
-                g = self.extended_data.columns.values[np.where([g in col for col in self.extended_data.columns.values])[0]][0]
+                g = \
+                self.extended_data.columns.values[np.where([g in col for col in self.extended_data.columns.values])[0]][
+                    0]
             ax = plt.subplot(gs[i // n_cols, i % n_cols])
             axes.append(ax)
             if isinstance(genes, dict):
@@ -900,7 +893,7 @@ class SCData:
                         edgecolors='none', s=size)
             if isinstance(genes, dict):
                 ax.set_title(g)
-            else:           
+            else:
                 ax.set_title(g[1])
             ax.xaxis.set_major_locator(plt.NullLocator())
             ax.yaxis.set_major_locator(plt.NullLocator())
@@ -912,9 +905,10 @@ class SCData:
         if other_data:
             for i, g in enumerate(genes):
                 if not isinstance(genes, dict):
-                    g = self.extended_data.columns.values[np.where([g in col for col in self.extended_data.columns.values])[0]][0]
-                
-                ax = plt.subplot(gs[(n_rows*n_cols +i) // n_cols, (n_rows*n_cols +i) % n_cols])
+                    g = self.extended_data.columns.values[
+                        np.where([g in col for col in self.extended_data.columns.values])[0]][0]
+
+                ax = plt.subplot(gs[(n_rows * n_cols + i) // n_cols, (n_rows * n_cols + i) % n_cols])
                 axes.append(ax)
                 if isinstance(genes, dict):
                     color = genes[g]
@@ -922,10 +916,10 @@ class SCData:
                     color = other_data.extended_data[g]
                 plt.scatter(other_data.tsne['tSNE1'], other_data.tsne['tSNE2'], c=color,
                             edgecolors='none', s=size)
-  
+
                 if isinstance(genes, dict):
                     ax.set_title(g)
-                else:             
+                else:
                     ax.set_title(g[1])
                 ax.xaxis.set_major_locator(plt.NullLocator())
                 ax.yaxis.set_major_locator(plt.NullLocator())
@@ -933,10 +927,9 @@ class SCData:
                 ax.set_ylabel('tSNE2')
                 plt.colorbar()
                 plt.axis('tight')
-        
+
         plt.tight_layout()
         return fig, axes
-
 
     def scatter_gene_expression(self, genes, density=False, color=None, fig=None, ax=None):
         """ 2D or 3D scatter plot of expression of selected genes
@@ -957,7 +950,8 @@ class SCData:
             raise RuntimeError('Please specify either 2 or 3 genes to scatter.')
 
         for i in range(len(genes)):
-            genes[i] = self.extended_data.columns.values[np.where([genes[i] in col for col in self.extended_data.columns.values])[0]][0]
+            genes[i] = self.extended_data.columns.values[
+                np.where([genes[i] in col for col in self.extended_data.columns.values])[0]][0]
 
         gui_3d_flag = True
         if ax == None:
@@ -983,7 +977,8 @@ class SCData:
                 ax.set_title('Color = ' + color.name)
                 plt.colorbar()
             elif color in self.extended_data.columns.get_level_values(1):
-                color = self.extended_data.columns.values[np.where([color in col for col in self.extended_data.columns.values])[0]][0]
+                color = self.extended_data.columns.values[
+                    np.where([color in col for col in self.extended_data.columns.values])[0]][0]
                 plt.scatter(self.extended_data[genes[0]], self.extended_data[genes[1]],
                             s=size, c=self.extended_data[color], edgecolors='none')
                 ax.set_title('Color = ' + color[1])
@@ -999,40 +994,41 @@ class SCData:
                 ax = fig.add_subplot(111, projection='3d')
 
             if density == True:
-                xyz = np.vstack([self.extended_data[genes[0]],self.extended_data[genes[1]],
+                xyz = np.vstack([self.extended_data[genes[0]], self.extended_data[genes[1]],
                                  self.extended_data[genes[2]]])
                 kde = gaussian_kde(xyz)
                 density = kde(xyz)
 
                 p = ax.scatter(self.extended_data[genes[0]], self.extended_data[genes[1]], self.extended_data[genes[2]],
-                           s=size, c=density, edgecolors='none')
+                               s=size, c=density, edgecolors='none')
                 ax.set_title('Color = density')
                 fig.colorbar(p)
             elif isinstance(color, pd.Series):
                 p = ax.scatter(self.extended_data[genes[0]], self.extended_data[genes[1]],
-                           self.extended_data[genes[2]], s=size, c=color, edgecolors='none')
+                               self.extended_data[genes[2]], s=size, c=color, edgecolors='none')
                 ax.set_title('Color = ' + color.name)
                 fig.colorbar(p)
             elif color in self.extended_data.columns.get_level_values(1):
-                color = self.extended_data.columns.values[np.where([color in col for col in self.extended_data.columns.values])[0]][0]
+                color = self.extended_data.columns.values[
+                    np.where([color in col for col in self.extended_data.columns.values])[0]][0]
                 p = ax.scatter(self.extended_data[genes[0]], self.extended_data[genes[1]],
-                           self.extended_data[genes[2]], s=size, c=self.extended_data[color], edgecolors='none')
+                               self.extended_data[genes[2]], s=size, c=self.extended_data[color], edgecolors='none')
                 ax.set_title('Color = ' + color[1])
                 fig.colorbar(p)
             else:
-                p = ax.scatter(self.extended_data[genes[0]], self.extended_data[genes[1]], self.extended_data[genes[2]], 
-                           edgecolors='none', s=size, color=qualitative_colors(2)[1] if color == None else color)
+                p = ax.scatter(self.extended_data[genes[0]], self.extended_data[genes[1]], self.extended_data[genes[2]],
+                               edgecolors='none', s=size, color=qualitative_colors(2)[1] if color == None else color)
             ax.set_xlabel(genes[0][1])
             ax.set_ylabel(genes[1][1])
             ax.set_zlabel(genes[2][1])
-            ax.view_init(15,55)
-        
+            ax.view_init(15, 55)
+
         plt.axis('tight')
         plt.tight_layout()
         return fig, ax
 
-
-    def scatter_gene_expression_against_other_data(self, genes, other_data, density=False, color=None, fig=None, ax=None):
+    def scatter_gene_expression_against_other_data(self, genes, other_data, density=False, color=None, fig=None,
+                                                   ax=None):
 
         not_in_dataframe = set(genes).difference(self.extended_data.columns.get_level_values(1))
         if not_in_dataframe:
@@ -1045,7 +1041,7 @@ class SCData:
             return
 
         height = int(4 * np.ceil(len(genes) / 3))
-        width = 12 if len(genes) >= 3 else 4*len(genes)
+        width = 12 if len(genes) >= 3 else 4 * len(genes)
         n_rows = int(height / 4)
         n_cols = int(width / 4)
         fig = plt.figure(figsize=[width, height])
@@ -1053,7 +1049,8 @@ class SCData:
 
         axes = []
         for i, g in enumerate(genes):
-            g = self.extended_data.columns.values[np.where([g in col for col in self.extended_data.columns.values])[0]][0]
+            g = self.extended_data.columns.values[np.where([g in col for col in self.extended_data.columns.values])[0]][
+                0]
             ax = plt.subplot(gs[i // n_cols, i % n_cols])
             axes.append(ax)
             if density == True:
@@ -1068,25 +1065,26 @@ class SCData:
                 plt.scatter(x, y, s=size, c=z, edgecolors='none')
                 plt.colorbar()
             elif isinstance(color, pd.Series):
-                plt.scatter(self.extended_data[g], other_data.extended_data[g], s=size, c=color, edgecolors='none') 
+                plt.scatter(self.extended_data[g], other_data.extended_data[g], s=size, c=color, edgecolors='none')
                 plt.colorbar()
             elif color in self.extended_data.columns.get_level_values(1):
-                color = self.extended_data.columns.values[np.where([color in col for col in self.extended_data.columns.values])[0]][0]
-                plt.scatter(self.extended_data[g], other_data.extended_data[g], s=size, c=self.extended_data[color], edgecolors='none')
+                color = self.extended_data.columns.values[
+                    np.where([color in col for col in self.extended_data.columns.values])[0]][0]
+                plt.scatter(self.extended_data[g], other_data.extended_data[g], s=size, c=self.extended_data[color],
+                            edgecolors='none')
                 plt.colorbar()
             else:
                 plt.scatter(self.extended_data[g], other_data.extended_data[g], s=size, edgecolors='none',
-                            color=qualitative_colors(2)[1] if color == None else color)  
+                            color=qualitative_colors(2)[1] if color == None else color)
             plt.axis('tight')
-                       
+
         gs.tight_layout(fig, pad=3, h_pad=3, w_pad=3)
 
         return fig, axes
 
-
     def run_magic(self, n_pca_components=20, random_pca=True, t=6, k=30, ka=10, epsilon=1, rescale_percent=99):
 
-        new_data = magic.MAGIC.magic(self.data.values, n_pca_components=n_pca_components, random_pca=random_pca, t=t, 
+        new_data = magic.MAGIC.magic(self.data.values, n_pca_components=n_pca_components, random_pca=random_pca, t=t,
                                      k=k, ka=ka, epsilon=epsilon, rescale=rescale_percent)
 
         new_data = pd.DataFrame(new_data, index=self.data.index, columns=self.data.columns)
@@ -1097,7 +1095,7 @@ class SCData:
 
     def concatenate_data(self, other_data_sets, join='outer', axis=0, names=[]):
 
-        #concatenate dataframes
+        # concatenate dataframes
         temp = self.data.copy()
         if axis == 0:
             temp.index = [str(names[0]) + ' ' + str(i) for i in self.data.index]
