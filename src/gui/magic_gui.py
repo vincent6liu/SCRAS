@@ -525,7 +525,9 @@ class magic_gui(tk.Tk):
             curKey = self.data_list.item(key)['text'].split(' (')[0]
 
             # run PCA on the selected dataset
-            self.data[curKey]['scdata'].run_pca(n_components=self.nComponents.get(), random=self.randomVar.get())
+            if self.data[curKey]['scdata'].pca is None:
+                self.data[curKey]['scdata'].run_pca(n_components=self.nComponents.get(), random=self.randomVar.get())
+
             self.data_list.insert(key, 'end', text=curKey + ' PCA' + 
                               ' (' + str(self.data[curKey]['scdata'].pca.shape[0]) + 
                                 ' x ' + str(self.data[curKey]['scdata'].pca.shape[1]) + ')', open=True)
@@ -547,8 +549,6 @@ class magic_gui(tk.Tk):
 
             self.currentPlot = 'pca'
             self.pcaOptions.destroy()
-        # self.visMenu.entryconfig(1, state='normal')
-        # self.pcaOptions.destroy()
 
     def runMagic(self):
         for key in self.data_list.selection():
@@ -612,8 +612,8 @@ class magic_gui(tk.Tk):
                                                                                                          row=0)
         self.magicProgress.update()
 
-
-        self.data[name]['scdata'].run_magic(n_pca_components=self.nCompVar.get() if self.nCompVar.get() > 0 else None,
+        if self.data[name]['scdata'].magic is None:
+            self.data[name]['scdata'].run_magic(n_pca_components=self.nCompVar.get() if self.nCompVar.get() > 0 else None,
                                             t=self.tVar.get(), k=self.kVar.get(), epsilon=self.epsilonVar.get(),
                                             rescale_percent=self.rescaleVar.get(), ka=self.autotuneVar.get(),
                                             random_pca=self.randomVar.get())
@@ -706,7 +706,8 @@ class magic_gui(tk.Tk):
         scdata.log_transform_scseq_data()
 
         print("running tSNE...")
-        scdata.run_tsne()
+        if scdata.tsne is None:
+            scdata.run_tsne()
 
         print("running PhenoGraph...")
         communities, graph, Q = phenograph.cluster(scdata.data, k=self.nnnumVar.get(),
@@ -715,8 +716,8 @@ class magic_gui(tk.Tk):
                                                    primary_metric=self.choiceVar.get(), n_jobs=self.njobVar.get(),
                                                    q_tol=self.toleVar.get(), louvain_time_limit=self.timeVar.get(),
                                                    nn_method=self.nnVar.get())
-        numCluster = np.max(communities)
-        communities = [str(int(i)) for i in communities]
+        numCluster = np.max(communities)+1
+        communities = [str(int(i)+1) for i in communities]
 
 
         print("plotting data points...")
@@ -768,7 +769,8 @@ class magic_gui(tk.Tk):
 
     def _runTSNE(self):
         name = self.data_list.item(self.curKey)['text'].split(' (')[0]
-        self.data[name]['scdata'].run_tsne(n_components=self.nCompVar.get(), perplexity=self.perplexityVar.get(),
+        if self.data[name]['scdata'].tsne is None:
+            self.data[name]['scdata'].run_tsne(n_components=self.nCompVar.get(), perplexity=self.perplexityVar.get(),
                                            n_iter=self.iterVar.get(), theta=self.angleVar.get())
         self.data[name]['gates'] = {}
 
@@ -827,8 +829,10 @@ class magic_gui(tk.Tk):
     def _runDM(self):
         for key in self.data_list.selection():
             name = self.data_list.item(key)['text'].split(' (')[0]
-            self.data[name]['scdata'].run_diffusion_map(n_diffusion_components=self.nCompVar.get(), epsilon=self.epsilonVar.get(), n_pca_components=self.nPCAVar.get(),
+            if self.data[name]['scdata'].diffusion_eigenvectors is None:
+                self.data[name]['scdata'].run_diffusion_map(n_diffusion_components=self.nCompVar.get(), epsilon=self.epsilonVar.get(), n_pca_components=self.nPCAVar.get(),
                                                         k=self.kVar.get(), ka=self.autotuneVar.get(), random_pca=self.randomPCAVar.get())
+
             self.data_list.insert(key, 'end', text=name + ' Diffusion components' +
                                   ' (' + str(self.data[name]['scdata'].diffusion_eigenvectors.shape[0]) + 
                                  ' x ' + str(self.data[name]['scdata'].diffusion_eigenvectors.shape[1]) + ')', open=True)
@@ -1223,7 +1227,7 @@ class magic_gui(tk.Tk):
 
     def quitMAGIC(self):
         self.quit()
-        self.master.destroy()
+        self.destroy()
 
 def launch():
     app = magic_gui(None)

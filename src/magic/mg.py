@@ -110,7 +110,6 @@ class SCData:
         self._diffusion_eigenvalues = None
         self._diffusion_map_correlations = None
         self._magic = None
-        self._normalized = False
 
         # Library size
         self._library_sizes = None
@@ -123,6 +122,15 @@ class SCData:
         """
         with open(fout, 'wb') as f:
             pickle.dump(vars(self), f)
+
+    def reset(self):
+        self._pca = None
+        self._tsne = None
+        self._diffusion_eigenvectors = None
+        self._diffusion_eigenvalues = None
+        self._diffusion_map_correlations = None
+        self._magic = None
+
 
     @classmethod
     def load(cls, fin):
@@ -457,6 +465,7 @@ class SCData:
 
     def log_transform_scseq_data(self, pseudocount=0.1):
         self.data = np.log(np.add(self.data, pseudocount))
+        self.reset()
 
     def plot_molecules_per_cell_and_gene(self, fig=None, ax=None):
 
