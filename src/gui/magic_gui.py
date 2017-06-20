@@ -696,20 +696,26 @@ class magic_gui(tk.Tk):
         self.phenoOptions.destroy()
         self.phenoProgress = tk.Toplevel()
         self.msgVar = tk.StringVar()
-        self.msgVar.set("Running PhenoGraph - refer to console for progress updates.")
+        self.msgVar.set("starting PhenoGraph...")
         self.phenoProgress.title(name + ': Running PhenoGraph')
-        tk.Label(self.phenoProgress, text="Running PhenoGraph - refer to console for progress updates.").grid(column=0,
-                                                                                                         row=0)
+        self.msgLb = tk.Label(self.phenoProgress, textvariable=self.msgVar).pack()
+
         self.phenoProgress.update()
 
         print("log-transforming the data...")
+        self.msgVar.set("log-transforming the data...")
+        self.phenoProgress.update()
         scdata.log_transform_scseq_data()
 
         print("running tSNE...")
+        self.msgVar.set("running tSNE...")
+        self.phenoProgress.update()
         if scdata.tsne is None:
             scdata.run_tsne()
 
         print("running PhenoGraph...")
+        self.msgVar.set("running PhenoGraph...")
+        self.phenoProgress.update()
         communities, graph, Q = phenograph.cluster(scdata.data, k=self.nnnumVar.get(),
                                                    directed=self.directedVar.get(), prune=self.pruneVar.get(),
                                                    min_cluster_size=self.minsVar.get(), jaccard=self.jaccVar.get(),
@@ -721,6 +727,8 @@ class magic_gui(tk.Tk):
 
 
         print("plotting data points...")
+        self.msgVar.set("plotting data points...")
+        self.phenoProgress.update()
         self.plotPheno(scdata, pd.Series(communities))
         self.phenoProgress.destroy()
 
@@ -1036,7 +1044,7 @@ class magic_gui(tk.Tk):
         gs.tight_layout(self.fig)
 
         self.tabs.append([tk.Frame(self.notebook), self.fig])
-        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text=name)
+        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text="Phenograph")
 
         self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
         self.canvas.show()
