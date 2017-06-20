@@ -25,7 +25,7 @@ import csv
 
 class magic_gui(tk.Tk):
     def __init__(self,parent):
-        tk.Tk.__init__(self,parent)
+        tk.Tk.__init__(self, parent)
         self.parent = parent
         self.initialize()
 
@@ -303,6 +303,8 @@ class magic_gui(tk.Tk):
             self.data_list.bind('<<TreeviewSelect>>', self._updateSelection)
 
             #make Treeview scrollable
+
+
             ysb = ttk.Scrollbar(orient=tk.VERTICAL, command=self.data_list.yview)
             xsb = ttk.Scrollbar(orient=tk.HORIZONTAL, command=self.data_list.xview)
             self.data_list.configure(yscroll=ysb.set, xscroll=xsb.set)
@@ -310,6 +312,7 @@ class magic_gui(tk.Tk):
             self.data_detail = ttk.Treeview()
             self.data_detail.heading('#0', text='Features')
             self.data_detail.grid(column=0, row=5, rowspan=7, sticky='NSEW')
+
             ysb2 = ttk.Scrollbar(orient=tk.VERTICAL, command=self.data_detail.yview)
             xsb2 = ttk.Scrollbar(orient=tk.HORIZONTAL, command=self.data_detail.xview)
             self.data_detail.configure(yscroll=ysb2.set, xscroll=xsb2.set)
@@ -1220,7 +1223,7 @@ class magic_gui(tk.Tk):
 
     def quitMAGIC(self):
         self.quit()
-        self.destroy()
+        self.master.destroy()
 
 def launch():
     app = magic_gui(None)
@@ -1234,10 +1237,13 @@ def launch():
         app.focus_force()
 
     app.title('MAGIC')
-    try:
-        app.mainloop()
-    except UnicodeDecodeError:
-        pass
+
+    while True:
+        try:
+            app.mainloop()
+            break
+        except UnicodeDecodeError:
+            pass
 
 if __name__ == "__main__":
     launch()
