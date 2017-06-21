@@ -64,7 +64,7 @@ class magic_gui(tk.Tk):
         self.config(menu=self.menubar)
 
         #intro screen
-        tk.Label(self, text=u"MAGIC", font=('Helvetica', 48), fg="black", bg="white", padx=100, pady=20).grid(row=0)
+        tk.Label(self, text=u"MAGIC/PhenoGraph", font=('Helvetica', 48), fg="black", bg="white", padx=100, pady=20).grid(row=0)
         tk.Label(self, text=u"Markov Affinity-based Graph Imputation of Cells", font=('Helvetica', 25), fg="black", bg="white", padx=100, pady=40).grid(row=1)
         tk.Label(self, text=u"To get started, select a data file by clicking File > Load Data", fg="black", bg="white", padx=100, pady=25).grid(row=2)
 
