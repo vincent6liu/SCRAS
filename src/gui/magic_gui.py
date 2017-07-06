@@ -22,6 +22,7 @@ import random
 import phenograph
 import time
 import csv
+import seaborn as sns
 
 class magic_gui(tk.Tk):
     def __init__(self,parent):
@@ -705,7 +706,8 @@ class magic_gui(tk.Tk):
         print("log-transforming the data...")
         self.msgVar.set("log-transforming the data...")
         self.phenoProgress.update()
-        scdata.log_transform_scseq_data()
+        if scdata.logtrans is False:
+            scdata.log_transform_scseq_data()
 
         print("running tSNE...")
         self.msgVar.set("running tSNE...")
@@ -723,7 +725,9 @@ class magic_gui(tk.Tk):
                                                    q_tol=self.toleVar.get(), louvain_time_limit=self.timeVar.get(),
                                                    nn_method=self.nnVar.get())
         numCluster = np.max(communities)+1
-        communities = [str(int(i)+1) for i in communities]
+        communities = [int(i) for i in communities]
+        diff = 1-min(communities)
+        communities = [str(i+diff) for i in communities]
 
 
         print("plotting data points...")
@@ -1000,7 +1004,7 @@ class magic_gui(tk.Tk):
             gs.tight_layout(self.fig)
 
             self.tabs.append([tk.Frame(self.notebook), self.fig])
-            self.notebook.add(self.tabs[len(self.tabs)-1][0], text=self.plotNameVar.get())
+            self.notebook.add(self.tabs[len(self.tabs)-1][0], text="tSNE")
 
             self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs)-1][0])
             self.canvas.show()

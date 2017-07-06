@@ -33,7 +33,7 @@ from sklearn.manifold.t_sne import _joint_probabilities, _joint_probabilities_nn
 from sklearn.neighbors import NearestNeighbors
 from sklearn.decomposition import PCA
 from scipy.spatial.distance import squareform
-from scipy.sparse import csr_matrix, find, vstack, hstack, issparse
+from scipy.sparse import csr_matrix, find, vstack, hstack, issparse, coo
 from scipy.sparse.linalg import eigs
 from numpy.linalg import norm
 from scipy.stats import gaussian_kde
@@ -104,12 +104,14 @@ class SCData:
         self._metadata = metadata
         self._data_type = data_type
         self._normalized = False
+        self._logtrans = False
         self._pca = None
         self._tsne = None
         self._diffusion_eigenvectors = None
         self._diffusion_eigenvalues = None
         self._diffusion_map_correlations = None
         self._magic = None
+        self._phenograph = None
 
         # Library size
         self._library_sizes = None
@@ -190,6 +192,16 @@ class SCData:
         if not isinstance(item, pd.DataFrame):
             raise TypeError('SCData.metadata must be of type DataFrame')
         self._metadata = item
+
+    @property
+    def logtrans(self):
+        return self._logtrans
+
+    @logtrans.setter
+    def logtrans(self, boolean):
+        if not isinstance(boolean, bool):
+            raise TypeError('must be a boolean value')
+        self._logtrans = boolean
 
     @property
     def pca(self):
@@ -275,6 +287,20 @@ class SCData:
         if not (isinstance(item, magic.mg.SCData) or item is None):
             raise TypeError('self.magic must be a SCData object')
         self._magic = item
+
+    """
+    @property
+    def phenograph(self):
+        return  self._phenograph
+
+    @phenograph.setter
+    def phenograph(self, item):
+        if not (isinstance(item[0], np.ndarray) and isinstance(item[1], coo.coo_matrix) and isinstance(item[2], float)):
+            raise TypeError('wrong data type for phenograph')
+        elif item is None:
+            raise TypeError('datta cannot be empty for phenograph')
+        self._phenograph = item
+    """
 
     @property
     def library_sizes(self):
@@ -465,6 +491,7 @@ class SCData:
 
     def log_transform_scseq_data(self, pseudocount=0.1):
         self.data = np.log(np.add(self.data, pseudocount))
+        self._logtrans = True
         self.reset()
 
     def plot_molecules_per_cell_and_gene(self, fig=None, ax=None):
