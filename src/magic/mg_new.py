@@ -85,7 +85,7 @@ def density_2d(x, y):
 
 
 class SCData:
-    def __init__(self, name: str, data, data_type='sc-seq', metdata=None):
+    def __init__(self, name: str, data, data_type='sc-seq', metdata=None, operation: Operations=None):
         if not (isinstance(data, pd.DataFrame)):
             raise TypeError('data must be of type DataFrame')
         if data_type not in ['sc-seq', 'masscyt']:
@@ -101,7 +101,9 @@ class SCData:
         self._data_type = data_type
         self._normalized = False
         self._logtrans = False
-        self._magic = False
+        self._magic = magic
+
+        self._operation = Operations(sourcename=self.name) if not operation else Operations(inherite=operation.history)
 
         # Library size (whats this??)
         self._library_sizes = None
@@ -157,6 +159,10 @@ class SCData:
     @property
     def normalized(self):
         return self._normalized
+
+    @property
+    def operation(self):
+        return self._operation
 
     # returns the data dictionary
     @property
@@ -427,8 +433,11 @@ class SCData:
         solver = 'randomized' if rand else 'full'
 
         pca = PCA(n_components=n_components, svd_solver=solver)
-        self.datadict[key] = pd.DataFrame(data=pca.fit_transform(self.data.values), index=self.data.index,
-                                          columns=['PC' + str(i) for i in range(1, n_components + 1)])
+        new_data = pd.DataFrame(data=pca.fit_transform(self.data.values), index=self.data.index,
+                                columns=['PC' + str(i) for i in range(1, n_components + 1)])
+        scdata = magic.mg.SCData(key, new_data, self.data_type, self.metadata, self.operation)
+        scdata.operation.add('PCA', str(n_components))
+        self.datadict[key] = scdata
 
     def plot_pca_variance_explained(self, n_components=30,
                                     fig=None, ax=None, ylim=(0, 100), random=True):
@@ -567,6 +576,7 @@ class SCData:
         plt.tight_layout()
         return fig, ax
 
+    # need to be rewritten
     def run_diffusion_map(self, k=10, epsilon=1, distance_metric='euclidean',
                           n_diffusion_components=10, n_pca_components=15, ka=0, random_pca=True):
         """ Run diffusion maps on the data. Run on the principal component projections
@@ -775,17 +785,20 @@ class SCData:
     #                                               ax=None)
 
     def run_magic(self, n_pca_components=20, random_pca=True, t=6, k=30, ka=10, epsilon=1, rescale_percent=99):
-        par = '-'.join(str(n_pca_components), str(random_pca), str(t), str(k), str(ka), str(epsilon), str(rescale_percent))
-        key = self.name + ":MAGIC:" + par
         new_data = magic.MAGIC.magic(self.data.values, n_pca_components=n_pca_components, random_pca=random_pca, t=t,
                                      k=k, ka=ka, epsilon=epsilon, rescale=rescale_percent)
 
         new_data = pd.DataFrame(new_data, index=self.data.index, columns=self.data.columns)
 
         # Construct class object
-        scdata = magic.mg.SCData(key, new_data, data_type=self.data_type)
+        par = '-'.join(str(n_pca_components), str(random_pca), str(t), str(k), str(ka), str(epsilon),
+                       str(rescale_percent))
+        key = self.name + ":MAGIC:" + par
+        scdata = magic.mg.SCData(key, new_data, self.data_type, self.metadata, self.operation)
+        scdata.operation.add('MAGIC', par)
         self.datadict[key] = scdata
 
+    # need to be rewritten
     def concatenate_data(self, other_data_sets, join='outer', axis=0, names=[]):
 
         # concatenate dataframes
@@ -806,7 +819,7 @@ class SCData:
             dfs.append(temp)
         df_concat = pd.concat(dfs, join=join, axis=axis)
 
-        scdata = magic.mg.SCData(self.name + "concatenated", df_concat)
+        scdata = magic.mg.SCData(self.name + "concatenated", df_concat, self.data_type)
         return scdata
 
 
@@ -833,4 +846,23 @@ class ClusterInfo:
     @property
     def modscore(self):
         return self._modscore
+
+
+class Operations:
+    def __init__(self, sourcename:str=None, inherite:list=None):
+        if not sourcename and not inherite:
+            raise RuntimeError("sourcename and inherite can't both be None")
+        self._history = inherite if inherite else [sourcename]
+        self._operations = ("PCA", "TSNE", "DM", "MAGIC", "PHENOGRAPH", "LOGTRANS", "NORMALIZED")
+
+    @property
+    def history(self):
+        return self._history
+
+    def add(self, op: str, params: str):
+        if op not in self._operations:
+            raise RuntimeError("Invalid operation.")
+        cur_op = op + " " + params
+        self._operations.append(cur_op)
+
 
