@@ -7,14 +7,10 @@ from sklearn.decomposition import PCA
 from scipy.spatial.distance import squareform
 from sklearn.neighbors import NearestNeighbors
 
-def magic(data, n_pca_components=20, random_pca=True, 
-          t=6, k=30, ka=10, epsilon=1, rescale=99):
+def magic(data, pca_data=None, t=6, k=30, ka=10, epsilon=1, rescale=99):
 
-    if n_pca_components != None:
-        print('doing PCA')
-        pca_projected_data = run_pca(data, n_components=n_pca_components, random=random_pca)
-    else:
-        pca_projected_data = data
+    if pca_data == None:
+        pca_data = data
 
     #run diffusion maps to get markov matrix
     L = compute_markov(pca_projected_data, k=k, epsilon=epsilon, 
@@ -37,17 +33,6 @@ def magic(data, n_pca_components=20, random_pca=True,
     new_data, L_t = impute_fast(data, L, t, rescale_percent=rescale)
 
     return new_data
-
-
-def run_pca(data, n_components=100, random=True):
-
-    solver = 'randomized'
-    if random != True:
-        solver = 'full'
-
-    pca = PCA(n_components=n_components, svd_solver=solver)
-    return pca.fit_transform(data)
-
 
 def impute_fast(data, L, t, rescale_percent=0, L_t=None, tprev=None):
 

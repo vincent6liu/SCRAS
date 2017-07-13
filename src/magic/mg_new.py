@@ -9,6 +9,9 @@ from copy import deepcopy
 from collections import defaultdict, Counter
 from subprocess import call, Popen, PIPE
 import glob
+import warnings
+import unittest
+import copy
 
 import numpy as np
 import pandas as pd
@@ -84,24 +87,64 @@ def density_2d(x, y):
     return np.ravel(x)[i], np.ravel(y)[i], np.arcsinh(z[i])
 
 
+class ClusterInfo:
+    def __init__(self, communities, graph, Q, source, method='phenograph'):
+        if not isinstance(communities, np.ndarray):
+            raise TypeError("communities must be a numpy array")
+        elif not isinstance(graph, coo.coo_matrix):
+            raise TypeError("graph must be of type scipy.coo.coo_matrix")
+        elif not isinstance(Q, float):
+            raise TypeError("modularity score Q must be float")
+        self._cluster = communities
+        self._graph = graph
+        self._modscore = Q
+
+    @property
+    def cluster(self):
+        return self._cluster
+
+    @property
+    def graph(self):
+        return self._graph
+
+    @property
+    def modscore(self):
+        return self._modscore
+
+
+class Operations:
+    def __init__(self, sourcename: str=None, inherite: list=None):
+        if not sourcename and not inherite:
+            raise RuntimeError("sourcename and inherite can't both be None")
+        self._history = copy.deepcopy(inherite) if inherite else [sourcename]
+        self._operations = ("PCA", "TSNE", "DM", "MAGIC", "PHENOGRAPH", "LOGTRANS", "NORMALIZED")
+
+    @property
+    def history(self):
+        return self._history
+
+    def add(self, op: str, params: str=''):
+        if op not in self._operations:
+            raise RuntimeError("Invalid operation.")
+        cur_op = op + ':' + params
+        self._history.append(cur_op)
+
+
 class SCData:
-    def __init__(self, name: str, data, data_type='sc-seq', metdata=None, operation: Operations=None):
+    def __init__(self, name: str, data, data_type='sc-seq', metadata=None, operation: Operations=None):
         if not (isinstance(data, pd.DataFrame)):
             raise TypeError('data must be of type DataFrame')
         if data_type not in ['sc-seq', 'masscyt']:
             raise RuntimeError('data type must be either sc-seq or masscyt')
-        if metdata is None:
-            metadata = pd.DataFrame(index=data.index, dtype='0')
+        if metadata is None:
+            metadata = pd.DataFrame(index=data.index, dtype='O')
 
         # initiate the data dictionary with the given data
+        self._name = name
         cols = [np.array(['data'] * data.shape[1]), np.array(data.columns.values)]
         self._datadict = {name: pd.DataFrame(data.values, index=data.index, columns=cols)}
-        self._name = name
-        self._metadata = metadata
         self._data_type = data_type
-        self._normalized = False
-        self._logtrans = False
-        self._magic = magic
+        self._metadata = metadata
 
         self._operation = Operations(sourcename=self.name) if not operation else Operations(inherite=operation.history)
 
@@ -110,11 +153,7 @@ class SCData:
 
     # may need to be rewritten
     def reset(self):
-        self._normalized = False
-        self._logtrans = False
-        self._magic = False
         self._library_sizes = None
-        self._backup = None
 
     def save(self, out_file: str):
         with open(out_file, 'wb') as f:
@@ -133,11 +172,12 @@ class SCData:
         return scdata
 
     def __repr__(self):
-        c, g = self.data[self.name].shape
+        c, g = self.data.shape
         _repr = ('SCData: {c} cells x {g} genes\n'.format(g=g, c=c))
-        for k, v in sorted(vars(self).items()):
-            if not (k == '_data'):
-                _repr += '\n{}={]'.format(k[1:], 'None' if v is None else 'True')
+        _repr += '\n{} = {}'.format('name', self._name)
+        _repr += '\n{} = {}'.format('data type', self._data_type)
+        _repr += '\n{} = {}'.format('number of derived datasets', len(self._datadict)-1)
+        _repr += '\n{}: {}'.format('operation history', ' '.join(self._operation.history))
         return _repr
 
     @property
@@ -147,18 +187,6 @@ class SCData:
     @property
     def data_type(self):
         return self._data_type
-
-    @property
-    def logtrans(self):
-        return self._logtrans
-
-    @property
-    def magic(self):
-        return self._magic
-
-    @property
-    def normalized(self):
-        return self._normalized
 
     @property
     def operation(self):
@@ -216,7 +244,7 @@ class SCData:
     def from_csv(cls, counts_csv_file, data_name: str, data_type='sc-seq', cell_axis=0, delimiter=',',
                  rows_after_header_to_skip=0, cols_after_header_to_skip=0, normalize=True):
 
-        if not data_type in ['sc-seq', 'masscyt']:
+        if data_type not in ['sc-seq', 'masscyt']:
             raise RuntimeError('data_type must be either sc-seq or masscyt')
 
         # Read in csv file
@@ -231,15 +259,17 @@ class SCData:
         # Construct class object
         scdata = cls(data_name, df, data_type=data_type)
 
+        """
         # Normalize if specified
         if normalize:
             scdata = scdata.normalize_scseq_data()
+        """
 
         return scdata
 
     @classmethod
     def from_fcs(cls, fcs_file, data_name: str, cofactor=5,
-                 metadata_channels=['Time', 'Event_length', 'DNA1', 'DNA2', 'Cisplatin', 'beadDist', 'bead1']):
+                 metadata_channels=('Time', 'Event_length', 'DNA1', 'DNA2', 'Cisplatin', 'beadDist', 'bead1')):
 
         # Parse the fcs file
         text, data = fcsparser.parse(fcs_file)
@@ -349,6 +379,233 @@ class SCData:
 
         return scdata
 
+    def normalize_scseq_data(self):
+        """
+        Normalize single cell RNA-seq data: Divide each cell by its molecule count
+        and multiply counts of cells by the median of the molecule counts
+        This is the only operation that changes data directly rather than adding a new SCData object
+        """
+
+        molecule_counts = self.data.sum(axis=1)
+        self._datadict[self.name] = self.data.div(molecule_counts, axis=0) \
+            .mul(np.median(molecule_counts), axis=0)
+
+        # check that none of the genes are empty; if so remove them
+        nonzero_genes = self.data.sum(axis=0) != 0
+        self._datadict[self.name] = self.data.loc[:, nonzero_genes].astype(np.float32)
+
+        # set unnormalized_cell_sums
+        self.library_sizes = molecule_counts
+        self.operation.add('NORMALIZED')
+
+    def log_transform_scseq_data(self, pseudocount=0.1):
+        # check whether the current data has already been log-transformed
+        for op in self.operation.history:
+            if 'LOGTRANS' in op:
+                warnings.warn("Performing log-transformation on already log-transformed data")
+
+        key = self._name + ":LOGTRANS:" + str(pseudocount)
+        new_data = np.log(np.add(self.data, pseudocount))
+        scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
+        scdata.operation.add('LOGTRANS', str(pseudocount))
+
+        # keep only one copy of the log-transformed data
+        for k in self.datadict.keys():
+            if 'LOGTRANS' in k.upper():
+                self._datadict.pop(k)
+
+        self.datadict[key] = scdata
+
+    def run_pca(self, n_components=100, rand=True):
+        """
+        Principal component analysis of the data.
+        Note: Column values for the old method are (dataname, PCX) now its just PCX
+        :param n_components: Number of components to project the data
+        :param rand: Whether randomized
+        """
+        solver = 'randomized' if rand else 'full'
+
+        pca = PCA(n_components=n_components, svd_solver=solver)
+        new_data = pd.DataFrame(data=pca.fit_transform(self.data.values), index=self.data.index,
+                                columns=['PC' + str(i) for i in range(1, n_components + 1)])
+
+        key = self.name + ":PCA:" + str(n_components)
+        scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
+        scdata.operation.add('PCA', str(n_components))
+        self.datadict[key] = scdata
+
+    def run_tsne(self, n_components=50, perplexity=30, n_iter=1000, theta=0.5):
+        """ Run tSNE on the data. tSNE is run on the principal component projections
+        for single cell RNA-seq data and on the expression matrix for mass cytometry data
+        stored in the data dictionary as "name:TSNE:comp-perp-iter-theta"
+        Note: Column values for the old method are (dataname, tSNE) now its just tSNE
+        :param n_components: Number of components to use for running tSNE for single cell
+        RNA-seq data. Ignored for mass cytometry
+        :return: None
+        """
+        pca_keys = [pca_key for pca_key in self.datadict.keys() if 'PCA' in pca_key.upper()]
+        comps = []
+        if bool(pca_keys):
+            comps = sorted([int(key[key.rfind(':')+1:]) for key in pca_keys])
+            low_comp = min(comps)
+
+        # Work on PCA projections if data is single cell RNA-seq
+        if self.data_type == 'sc-seq':
+            if n_components in comps:
+                pca_data = self.datadict[(self.name+":PCA:"+str(n_components))]
+            elif (not bool(pca_keys)) or n_components > low_comp:
+                self.run_pca(n_components=n_components)
+                pca_data = self.datadict[(self.name+":PCA:"+str(n_components))]
+            else:  # n_components <= low_comp
+                pca_data = self.datadict[(self.name+":PCA:"+str(low_comp))].iloc[:, :n_components]
+        else:
+            pca_data = self
+
+        # Reduce perplexity if necessary
+        perplexity_limit = 15
+        if pca_data.data.shape[0] < 100 and perplexity > perplexity_limit:
+            print('Reducing perplexity to %d since there are <100 cells in the dataset. ' % perplexity_limit)
+        tsne = TSNE(n_components=2, perplexity=perplexity, init='random', random_state=sum(pca_data.data.shape), n_iter=n_iter,
+                    angle=theta)
+
+        new_data = pd.DataFrame(tsne.fit_transform(pca_data.data),
+                                 index=self.data.index, columns=['tSNE1', 'tSNE2'])
+        par = "-".join((str(n_components), str(perplexity), str(n_iter), str(theta)))
+        key = self.name + ":TSNE:" + par
+        scdata = SCData(key, new_data, pca_data.data_type, pca_data.metadata, pca_data.operation)
+        scdata.operation.add('TSNE', par)
+        pca_data.datadict[key] = scdata
+
+    def run_magic(self, n_pca_components=20, random_pca=True, t=6, k=30, ka=10, epsilon=1, rescale_percent=99):
+        pca_keys = [pca_key for pca_key in self.datadict.keys() if 'PCA' in pca_key.upper()]
+        comps = []
+        if bool(pca_keys):
+            comps = sorted([int(key[key.rfind(':') + 1:]) for key in pca_keys])
+            low_comp = min(comps)
+
+        # Work on PCA projections if data is single cell RNA-seq
+        if self.data_type == 'sc-seq' and n_pca_components > 0:
+            if n_pca_components in comps:
+                pca_data = self.datadict[(self.name + ":PCA:" + str(n_pca_components))]
+            elif (not bool(pca_keys)) or n_pca_components > low_comp:
+                self.run_pca(n_components=n_pca_components)
+                pca_data = self.datadict[(self.name + ":PCA:" + str(n_pca_components))]
+            else:  # n_components <= low_comp
+                pca_data = self.datadict[(self.name + ":PCA:" + str(low_comp))].iloc[:, :n_pca_components]
+        else:
+            pca_data = self
+
+        new_data = magic.MAGIC.magic(self.data.values, pca_data.data.values,
+                                     t=t, k=k, ka=ka, epsilon=epsilon, rescale=rescale_percent)
+
+        new_data = pd.DataFrame(new_data, index=self.data.index, columns=self.data.columns)
+
+        # Construct class object
+        par = '-'.join((str(n_pca_components), str(random_pca), str(t), str(k), str(ka), str(epsilon),
+                       str(rescale_percent)))
+        key = self.name + ":MAGIC:" + par
+        scdata = SCData(key, new_data, pca_data.data_type, pca_data.metadata, pca_data.operation)
+        scdata.operation.add('MAGIC', par)
+        pca_data.datadict[key] = scdata
+
+    # need to be rewritten
+    def run_diffusion_map(self, k=10, epsilon=1, distance_metric='euclidean',
+                          n_diffusion_components=10, n_pca_components=15, ka=0, random_pca=True):
+        """ Run diffusion maps on the data. Run on the principal component projections
+        for single cell RNA-seq data and on the expression matrix for mass cytometry data
+        :param k: Number of neighbors for graph construction to determine distances between cells
+        :param epsilon: Gaussian standard deviation for converting distances to affinities
+        :param n_diffusion_components: Number of diffusion components to Generalte
+        :param n_pca_components: Number of components to use for running tSNE for single cell
+        RNA-seq data. Ignored for mass cytometry
+        :return: None
+        """
+
+        if not n_pca_components:
+            pca_keys = [pca_key for pca_key in self.datadict.keys() if 'PCA' in pca_key.upper()]
+            comps = sorted([int(key[key.rfind(':') + 1:]) for key in pca_keys])
+            key = self.name + ":PCA:" + str(n_pca_components)
+            if n_pca_components in comps:
+                data = self.datadict[key]
+            else:
+                self.run_pca(n_components=n_pca_components, random=random_pca)
+                data = self.datadict[key]
+        else:
+            data = self.data
+
+        N = data.shape[0]
+
+        # Nearest neighbors
+        nbrs = NearestNeighbors(n_neighbors=k, metric=distance_metric).fit(data)
+        distances, indices = nbrs.kneighbors(data)
+
+        if ka > 0:
+            print('Autotuning distances')
+            for j in reversed(range(N)):
+                temp = sorted(distances[j])
+                lMaxTempIdxs = min(ka, len(temp))
+                if lMaxTempIdxs == 0 or temp[lMaxTempIdxs] == 0:
+                    distances[j] = 0
+                else:
+                    distances[j] = np.divide(distances[j], temp[lMaxTempIdxs])
+
+        # Adjacency matrix
+        rows = np.zeros(N * k, dtype=np.int32)
+        cols = np.zeros(N * k, dtype=np.int32)
+        dists = np.zeros(N * k)
+        location = 0
+        for i in range(N):
+            inds = range(location, location + k)
+            rows[inds] = indices[i, :]
+            cols[inds] = i
+            dists[inds] = distances[i, :]
+            location += k
+        if epsilon > 0:
+            W = csr_matrix((dists, (rows, cols)), shape=[N, N])
+        else:
+            W = csr_matrix((np.ones(dists.shape), (rows, cols)), shape=[N, N])
+
+        # Symmetrize W
+        W = W + W.T
+
+        if epsilon > 0:
+            # Convert to affinity (with selfloops)
+            rows, cols, dists = find(W)
+            rows = np.append(rows, range(N))
+            cols = np.append(cols, range(N))
+            dists = np.append(dists / (epsilon ** 2), np.zeros(N))
+            W = csr_matrix((np.exp(-dists), (rows, cols)), shape=[N, N])
+
+        # Create D
+        D = np.ravel(W.sum(axis=1))
+        D[D != 0] = 1 / D[D != 0]
+
+        # markov normalization
+        T = csr_matrix((D, (range(N), range(N))), shape=[N, N]).dot(W)
+
+        # Eigen value decomposition
+        D, V = eigs(T, n_diffusion_components, tol=1e-4, maxiter=1000)
+        D = np.real(D)
+        V = np.real(V)
+        inds = np.argsort(D)[::-1]
+        D = D[inds]
+        V = V[:, inds]
+        V = T.dot(V)
+
+        # Normalize
+        for i in range(V.shape[1]):
+            V[:, i] = V[:, i] / norm(V[:, i])
+        V = np.round(V, 10)
+
+        # Update object
+        par = '-'.join((str(k), str(epsilon), str(distance_metric), str(n_diffusion_components), str(n_pca_components),
+                        str(ka), str(random_pca)))
+        df_key = self.name + ":DM:" + par
+        diffusion_eigenvectors = pd.DataFrame(V, index=self.data.index,
+                                              columns=['DC' + str(i) for i in range(n_diffusion_components)])
+        diffusion_eigenvalues = pd.DataFrame(D)
+        self.datadict[df_key] = (diffusion_eigenvectors, diffusion_eigenvalues)
+
     def filter_scseq_data(self, filter_cell_min=0, filter_cell_max=0, filter_gene_nonzero=None, filter_gene_mols=None):
 
         if filter_cell_min != filter_cell_max:
@@ -366,34 +623,6 @@ class SCData:
             sums = self.data.sum(axis=0)
             to_keep = np.where(sums >= filter_gene_mols)[0]
             self.data = self.data.ix[:, to_keep].astype(np.float32)
-
-    def normalize_scseq_data(self):
-        """
-        Normalize single cell RNA-seq data: Divide each cell by its molecule count
-        and multiply counts of cells by the median of the molecule counts
-        :return: SCData
-        """
-
-        molecule_counts = self.data.sum(axis=1)
-        data = self.data.div(molecule_counts, axis=0) \
-            .mul(np.median(molecule_counts), axis=0)
-        scdata = SCData(name=self.name, data=data, metadata=self.metadata)
-        scdata._normalized = True
-
-        # check that none of the genes are empty; if so remove them
-        nonzero_genes = scdata.data.sum(axis=0) != 0
-        scdata.data = scdata.data.ix[:, nonzero_genes].astype(np.float32)
-
-        # set unnormalized_cell_sums
-        self.library_sizes = molecule_counts
-        scdata._library_sizes = molecule_counts
-
-        return scdata
-
-    def log_transform_scseq_data(self, pseudocount=0.1):
-        key = self._name + ":logtrans"
-        self.datadict[key] = np.log(np.add(self.data, pseudocount))
-        self._logtrans = True
 
     def plot_molecules_per_cell_and_gene(self, fig=None, ax=None):
         height = 4
@@ -423,22 +652,6 @@ class SCData:
 
         return fig, ax
 
-    def run_pca(self, n_components=100, rand=True):
-        """
-        Principal component analysis of the data.
-        :param n_components: Number of components to project the data
-        :param rand: Whether randomized
-        """
-        key = self.name + ":PCA:" + str(n_components)
-        solver = 'randomized' if rand else 'full'
-
-        pca = PCA(n_components=n_components, svd_solver=solver)
-        new_data = pd.DataFrame(data=pca.fit_transform(self.data.values), index=self.data.index,
-                                columns=['PC' + str(i) for i in range(1, n_components + 1)])
-        scdata = magic.mg.SCData(key, new_data, self.data_type, self.metadata, self.operation)
-        scdata.operation.add('PCA', str(n_components))
-        self.datadict[key] = scdata
-
     def plot_pca_variance_explained(self, n_components=30,
                                     fig=None, ax=None, ylim=(0, 100), random=True):
         """ Plot the variance explained by different principal components
@@ -463,41 +676,6 @@ class SCData:
         plt.ylabel('Percent Variance explained')
         plt.title('Principal components')
         return fig, ax
-
-    def run_tsne(self, n_components=50, perplexity=30, n_iter=1000, theta=0.5):
-        """ Run tSNE on the data. tSNE is run on the principal component projections
-        for single cell RNA-seq data and on the expression matrix for mass cytometry data
-        stored in the data dictionary as "name:TSNE:comp-perp-iter-theta"
-        :param n_components: Number of components to use for running tSNE for single cell
-        RNA-seq data. Ignored for mass cytometry
-        :return: None
-        """
-        pca_keys = [pca_key for pca_key in self.datadict.keys() if 'PCA' in pca_key.upper()]
-        if bool(pca_keys):
-            comps = sorted([int(key[key.rfind(':')+1:]) for key in pca_keys])
-            low_comp = min(comps)
-
-        # Work on PCA projections if data is single cell RNA-seq
-        if self.data_type == 'sc-seq':
-            if n_components in comps:
-                data = self.datadict[(self.name+":PCA:"+str(n_components))]
-            elif (not bool(pca_keys)) or n_components > low_comp:
-                self.run_pca(n_components=n_components)
-                data = self.datadict[(self.name+":PCA:"+str(n_components))]
-            else:  # n_components <= low_comp
-                data = self.datadict[(self.name+":PCA:"+str(low_comp))].iloc[:, :n_components]
-        else:
-            data = self.data
-
-        # Reduce perplexity if necessary
-        perplexity_limit = 15
-        if data.shape[0] < 100 and perplexity > perplexity_limit:
-            print('Reducing perplexity to %d since there are <100 cells in the dataset. ' % perplexity_limit)
-        tsne = TSNE(n_components=2, perplexity=perplexity, init='random', random_state=sum(data.shape), n_iter=n_iter,
-                    angle=theta)
-        key = self.name + ":TSNE:" + "-".join((str(n_components), str(perplexity), str(n_iter), str(theta)))
-        self.datadict[key] = pd.DataFrame(tsne.fit_transform(data),
-                                 index=self.data.index, columns=['tSNE1', 'tSNE2'])
 
     def plot_tsne(self, param: str, fig=None, ax=None, density=False, color=None, title='tSNE projection'):
         """Plot tSNE projections of the data
@@ -784,20 +962,6 @@ class SCData:
     # def scatter_gene_expression_against_other_data(self, genes, other_data, density=False, color=None, fig=None,
     #                                               ax=None)
 
-    def run_magic(self, n_pca_components=20, random_pca=True, t=6, k=30, ka=10, epsilon=1, rescale_percent=99):
-        new_data = magic.MAGIC.magic(self.data.values, n_pca_components=n_pca_components, random_pca=random_pca, t=t,
-                                     k=k, ka=ka, epsilon=epsilon, rescale=rescale_percent)
-
-        new_data = pd.DataFrame(new_data, index=self.data.index, columns=self.data.columns)
-
-        # Construct class object
-        par = '-'.join(str(n_pca_components), str(random_pca), str(t), str(k), str(ka), str(epsilon),
-                       str(rescale_percent))
-        key = self.name + ":MAGIC:" + par
-        scdata = magic.mg.SCData(key, new_data, self.data_type, self.metadata, self.operation)
-        scdata.operation.add('MAGIC', par)
-        self.datadict[key] = scdata
-
     # need to be rewritten
     def concatenate_data(self, other_data_sets, join='outer', axis=0, names=[]):
 
@@ -823,46 +987,123 @@ class SCData:
         return scdata
 
 
-class ClusterInfo:
-    def __init__(self, communities, graph, Q, source, method='phenograph'):
-        if not isinstance(communities, np.ndarray):
-            raise TypeError("communities must be a numpy array")
-        elif not isinstance(graph, coo.coo_matrix):
-            raise TypeError("graph must be of type scipy.coo.coo_matrix")
-        elif not isinstance(Q, float):
-            raise TypeError("modularity score Q must be float")
-        self._cluster = communities
-        self._graph = graph
-        self._modscore = Q
+class Tester(unittest.TestCase):
+    def setUp(self):
+        self.scData = SCData.from_csv("/Users/vincentliu/Desktop/Pe'er Lab/Summer 2017/Data/pbmc_4k_short.csv", "Data0")
 
-    @property
-    def cluster(self):
-        return self._cluster
+    """
+    def testName(self):
+        self.assertEqual(self.scData.name, 'Data0')
 
-    @property
-    def graph(self):
-        return self._graph
+    def testDatadict(self):
+        self.assertIsInstance(self.scData.datadict, dict)
+        self.assertIsInstance(self.scData.datadict[self.scData.name], pd.DataFrame)
 
-    @property
-    def modscore(self):
-        return self._modscore
+    def testData(self):
+        self.assertIsInstance(self.scData.data, pd.DataFrame)
+
+    def testDataType(self):
+        self.assertEqual(self.scData.data_type, 'sc-seq')
+
+    def testOperation(self):
+        self.assertIsInstance(self.scData.operation, Operations)
+        self.assertEqual(self.scData.operation.history, [self.scData.name])
+
+    def testNormalize(self):
+        data = self.scData.data
+        old_his = copy.deepcopy(self.scData.operation.history)
+        print(self.scData.data)
+        self.scData.normalize_scseq_data()
+        print(self.scData.data)
+        self.assertNotEqual(old_his, self.scData.operation.history)
+        self.assertIn('NORMALIZED:', self.scData.operation.history)
+
+    def testLogTrans(self):
+        data = copy.deepcopy(self.scData.data)
+        old_his = copy.deepcopy(self.scData.operation.history)
+        self.assertTrue(len(self.scData.datadict.keys()) == 1)
+
+        self.scData.log_transform_scseq_data()
+        self.assertEqual(old_his, self.scData.operation.history)
+        self.assertIn(self.scData.name + ":LOGTRANS:" + str(0.1), self.scData.datadict.keys())
+        self.assertTrue(len(self.scData.datadict.keys()) == 2)
+
+        newobj = self.scData.datadict[self.scData.name + ":LOGTRANS:" + str(0.1)]
+        self.assertIsInstance(newobj, SCData)
+        self.assertNotEqual(self.scData.operation.history, newobj.operation.history)
+        self.assertTrue(len([x for x in newobj.operation.history if 'LOGTRANS' in x]) == 1)"""
+
+    """
+    def testPCA(self):
+        data = copy.deepcopy(self.scData.data)
+        old_his = copy.deepcopy(self.scData.operation.history)
+        self.assertTrue(len(self.scData.datadict.keys()) == 1)
+
+        self.scData.run_pca()
+        self.assertEqual(old_his, self.scData.operation.history)
+        self.assertIn(self.scData.name + ":PCA:" + str(100), self.scData.datadict.keys())
+        self.assertTrue(len(self.scData.datadict.keys()) == 2)
+
+        newobj = self.scData.datadict[self.scData.name + ":PCA:" + str(100)]
+        self.assertIsInstance(newobj, SCData)
+        self.assertNotEqual(self.scData.operation.history, newobj.operation.history)
+        self.assertTrue('PCA' in newobj.operation.history[-1])
+
+        oldobj = magic.mg.SCData.from_csv("/Users/vincentliu/Desktop/Pe'er Lab/Summer 2017/Data/pbmc_4k_short.csv",
+                                           data_type='sc-seq', normalize=False)
+        oldobj.run_pca()
+        print(newobj.data.columns.values)
+        print("**********")
+        print(oldobj.pca.columns.values)
+        self.assertEqual(newobj.data.columns.values, oldobj.pca.columns.values)
+
+    def testTSNE(self):
+        data = copy.deepcopy(self.scData.data)
+        old_his = copy.deepcopy(self.scData.operation.history)
+        self.assertTrue(len(self.scData.datadict.keys()) == 1)
+
+        self.scData.run_tsne()
+        self.assertEqual(old_his, self.scData.operation.history)
+        self.assertTrue(len(self.scData.datadict.keys()) == 2)
+        self.assertTrue(len(self.scData.datadict[self.scData.name + ":PCA:" + "50"].datadict.keys()) == 2)
+
+        newobj = self.scData.datadict[self.scData.name + ":PCA:" + "50"].datadict[self.scData.name + ":TSNE:" + "50-30-1000-0.5"]
+        self.assertIsInstance(newobj, SCData)
+        self.assertNotEqual(self.scData.operation.history, newobj.operation.history)
+        self.assertTrue('TSNE' in newobj.operation.history[-1])
+        self.assertTrue('PCA' in newobj.operation.history[-2])
+        self.assertTrue(len(newobj.operation.history) == 3)
+
+        oldobj = magic.mg.SCData.from_csv("/Users/vincentliu/Desktop/Pe'er Lab/Summer 2017/Data/pbmc_4k_short.csv",
+                                          data_type='sc-seq', normalize=False)
+        oldobj.run_tsne()
+        print(newobj.data)
+        print("**********")
+        print(oldobj.tsne)
+        self.assertEqual(newobj.data.columns.values, oldobj.tsne.columns.values)
+
+    def testMagic(self):
+        data = copy.deepcopy(self.scData.data)
+        old_his = copy.deepcopy(self.scData.operation.history)
+        self.assertTrue(len(self.scData.datadict.keys()) == 1)
+
+        self.scData.run_magic()
+        self.assertEqual(old_his, self.scData.operation.history)
+        self.assertTrue(len(self.scData.datadict.keys()) == 2)
+        self.assertTrue(len(self.scData.datadict[self.scData.name + ":PCA:" + "20"].datadict.keys()) == 2)
+
+        newobj = self.scData.datadict[self.scData.name + ":PCA:" + "20"].datadict[self.scData.name + ":MAGIC:" + "20-True-6-30-10-1-99"]
+        self.assertIsInstance(newobj, SCData)
+        self.assertNotEqual(self.scData.operation.history, newobj.operation.history)
+        self.assertTrue('MAGIC' in newobj.operation.history[-1])
+        self.assertTrue('PCA' in newobj.operation.history[-2])
+        self.assertTrue(len(newobj.operation.history) == 3)
+
+        print(newobj.data)
+        print("**********")"""
 
 
-class Operations:
-    def __init__(self, sourcename:str=None, inherite:list=None):
-        if not sourcename and not inherite:
-            raise RuntimeError("sourcename and inherite can't both be None")
-        self._history = inherite if inherite else [sourcename]
-        self._operations = ("PCA", "TSNE", "DM", "MAGIC", "PHENOGRAPH", "LOGTRANS", "NORMALIZED")
 
-    @property
-    def history(self):
-        return self._history
-
-    def add(self, op: str, params: str):
-        if op not in self._operations:
-            raise RuntimeError("Invalid operation.")
-        cur_op = op + " " + params
-        self._operations.append(cur_op)
-
+if __name__ == '__main__':
+    unittest.main()
 
