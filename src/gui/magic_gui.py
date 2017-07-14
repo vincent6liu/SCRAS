@@ -25,6 +25,7 @@ class magic_gui(tk.Tk):
         self.parent = parent
         self.initialize()
 
+    # updated
     def initialize(self):
         self.grid()
         self.vals = None
@@ -72,6 +73,7 @@ class magic_gui(tk.Tk):
         self.geometry(self.geometry())       
         self.focus_force()
 
+    # updated
     def loadCSV(self):
         self.dataFileName = filedialog.askopenfilename(title='Load data file', initialdir='~/.magic/data')
         if(self.dataFileName != ""):
@@ -262,6 +264,7 @@ class magic_gui(tk.Tk):
 
             self.wait_window(self.fileInfo)
 
+    # updated
     def getGeneNameFile(self):
         self.geneNameFile = filedialog.askopenfilename(title='Select gene name file', initialdir='~/.magic/data')
         tk.Label(self.fileInfo,text=self.geneNameFile.split('/')[-1] ,fg="black",bg="white").grid(column=1, row=2)
@@ -285,6 +288,7 @@ class magic_gui(tk.Tk):
 
             self.wait_window(self.fileInfo)
 
+    # updated
     def processData(self, file_type='csv'):
 
         if len(self.data) == 0:
@@ -376,6 +380,7 @@ class magic_gui(tk.Tk):
             if pickleFileName != None:
                 self.data[name]['scdata'].save(pickleFileName)
 
+    # updated, may need to be modified later
     def concatenateData(self):
         self.concatOptions = tk.Toplevel()
         self.concatOptions.title("Concatenate data sets")
@@ -396,25 +401,31 @@ class magic_gui(tk.Tk):
         tk.Button(self.concatOptions, text="Cancel", command=self.concatOptions.destroy).grid(column=0, row=3)
         self.wait_window(self.concatOptions)
 
+    # updated, may need to be modified later
     def _concatenateData(self):
         to_concat = []
         for key in self.data_list.selection():
                 to_concat.append(self.data[self.data_list.item(key)['text'].split(' (')[0]]['scdata'])
 
-        scdata = to_concat[0].concatenate_data(to_concat[1:], axis=self.colVar.get(), join='outer' if self.joinVar.get() == True else 'inner',
-                                               names=[self.data_list.item(key)['text'].split(' (')[0] for key in self.data_list.selection()])
-
+        names = tuple(self.data_list.item(key)['text'].split(' (')[0] for key in self.data_list.selection())
+        join = 'outer' if self.joinVar.get() is True else 'inner'
+        scdata = to_concat[0].concatenate_data(to_concat[1:], names=names, axis=self.colVar.get(), join=join)
 
         self.data[self.nameVar.get()] = {'scdata' : scdata, 'wb' : None, 'state' : tk.BooleanVar(),
                                          'genes' : scdata.data.columns.values, 'gates' : {}}
         self.data_list.insert('', 'end', text=self.nameVar.get() + ' (' + str(scdata.data.shape[0]) + ' x ' + str(scdata.data.shape[1]) + ')', open=True)
 
+        for key in self.data_list.selection():
+            self.data_list.delete(key)
+
         self.concatOptions.destroy()
 
+    # need to be modified later
     def _deleteDataItem(self, event):
 
         self.data_detail.delete(*self.data_detail.get_children())
         for key in self.data_list.selection():
+            """
             name = self.data_list.item(key)['text'].split(' (')[0]
             if name in self.data:
                 del self.data[name]
@@ -432,6 +443,7 @@ class magic_gui(tk.Tk):
                 elif 'MAGIC' in name:
                     del self.data[data_set_name + ' MAGIC']
                     self.data[data_set_name]['scdata'].magic = None
+            """
             self.data_list.delete(key)
 
     def _updateSelection(self, event):
@@ -499,6 +511,7 @@ class magic_gui(tk.Tk):
 
         self.wait_window(self.dataDistributions)
 
+    # work on this
     def runPCA(self):
         self.pcaOptions = tk.Toplevel()
         self.pcaOptions.title("PCA options")
@@ -516,6 +529,7 @@ class magic_gui(tk.Tk):
         tk.Button(self.pcaOptions, text="Cancel", command=self.pcaOptions.destroy).grid(column=0, row=4)
         self.wait_window(self.pcaOptions)
 
+    # work on this
     def _runPCA(self):
         for key in self.data_list.selection():
             curKey = self.data_list.item(key)['text'].split(' (')[0]
