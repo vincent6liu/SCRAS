@@ -5,11 +5,7 @@ matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from matplotlib.figure import Figure
-from matplotlib.patches import Rectangle
-from matplotlib.path import Path
 from functools import reduce, partial
-import magic
 import os
 import sys
 import platform
@@ -17,12 +13,11 @@ import pandas as pd
 import tkinter as tk
 import numpy as np
 from tkinter import filedialog, ttk
-import pickle
-import random
 import phenograph
-import time
 import csv
-import seaborn as sns
+sys.path.insert(0, '/Users/vincentliu/PycharmProjects/magic/src/magic')
+import mg_new as magic
+
 
 class magic_gui(tk.Tk):
     def __init__(self,parent):
@@ -305,7 +300,6 @@ class magic_gui(tk.Tk):
 
             #make Treeview scrollable
 
-
             ysb = ttk.Scrollbar(orient=tk.VERTICAL, command=self.data_list.yview)
             xsb = ttk.Scrollbar(orient=tk.HORIZONTAL, command=self.data_list.xview)
             self.data_list.configure(yscroll=ysb.set, xscroll=xsb.set)
@@ -323,17 +317,18 @@ class magic_gui(tk.Tk):
             self.tabs = []
 
         if file_type == 'csv':    # sc-seq data
-            scdata = magic.mg.SCData.from_csv(os.path.expanduser(self.dataFileName), data_type='sc-seq',
-                                              cell_axis=self.rowVar.get(), delimiter=self.delimiter.get(),
-                                              rows_after_header_to_skip=self.rowHeader.get(), 
-                                              cols_after_header_to_skip=self.colHeader.get(),
-                                              normalize=False)
+            scdata = magic.SCData.from_csv(os.path.expanduser(self.dataFileName), data_name=self.fileNameEntryVar.get(),
+                                           data_type='sc-seq', cell_axis=self.rowVar.get(),
+                                           delimiter=self.delimiter.get(),
+                                           rows_after_header_to_skip=self.rowHeader.get(),
+                                           cols_after_header_to_skip=self.colHeader.get())
+
         elif file_type == 'mtx':   # sparse matrix
-            scdata = magic.mg.SCData.from_mtx(os.path.expanduser(self.dataFileName), 
+            scdata = magic.SCData.from_mtx(os.path.expanduser(self.dataFileName),
                                               os.path.expanduser(self.geneNameFile),
                                               normalize=False)
         elif file_type == '10x':
-            scdata = magic.mg.SCData.from_10x(self.dataDir, use_ensemble_id=self.geneVar.get(),
+            scdata = magic.SCData.from_10x(self.dataDir, use_ensemble_id=self.geneVar.get(),
                                               normalize=False)
             
         if file_type != 'pickle':
@@ -343,14 +338,14 @@ class magic_gui(tk.Tk):
                                          filter_gene_nonzero=int(self.filterGeneNonzeroVar.get()) if len(self.filterGeneNonzeroVar.get()) > 0 else 0, 
                                          filter_gene_mols=int(self.filterGeneMolsVar.get()) if len(self.filterGeneMolsVar.get()) > 0 else 0)
 
-            if self.normalizeVar.get() == True:
-                scdata = scdata.normalize_scseq_data() 
+            if self.normalizeVar.get() is True:
+                scdata.normalize_scseq_data()
 
-            if self.logTransform.get() == True:
+            if self.logTransform.get() is True:
                 scdata.log_transform_scseq_data(pseudocount=self.pseudocount.get())
 
         else:   # pickled Wishbone object
-            scdata = magic.mg.SCData.load(os.path.expanduser(self.dataFileName))
+            scdata = magic.SCData.load(os.path.expanduser(self.dataFileName))
 
         self.data[self.fileNameEntryVar.get()] = {'scdata' : scdata, 'state' : tk.BooleanVar(),
                                                   'genes' : scdata.data.columns.values, 'gates' : {}}
@@ -483,13 +478,13 @@ class magic_gui(tk.Tk):
 
     def showRawDataDistributions(self, file_type='csv'):
         if file_type == 'csv':    # sc-seq data
-            scdata = magic.mg.SCData.from_csv(os.path.expanduser(self.dataFileName), 
+            scdata = magic.SCData.from_csv(os.path.expanduser(self.dataFileName),
                                               data_type='sc-seq', normalize=False)
         elif file_type == 'mtx':   # sparse matrix
-            scdata = magic.mg.SCData.from_mtx(os.path.expanduser(self.dataFileName), 
+            scdata = magic.SCData.from_mtx(os.path.expanduser(self.dataFileName),
                                               os.path.expanduser(self.geneNameFile))
         elif file_type == '10x':
-            scdata = magic.mg.SCData.from_10x(self.dataDir)
+            scdata = magic.SCData.from_10x(self.dataDir)
 
         self.dataDistributions = tk.Toplevel()
         self.dataDistributions.title(self.fileNameEntryVar.get() + ": raw data distributions")
@@ -613,21 +608,25 @@ class magic_gui(tk.Tk):
                                                                                                          row=0)
         self.magicProgress.update()
 
-        if self.data[name]['scdata'].magic is None:
-            self.data[name]['scdata'].run_magic(n_pca_components=self.nCompVar.get() if self.nCompVar.get() > 0 else None,
-                                            t=self.tVar.get(), k=self.kVar.get(), epsilon=self.epsilonVar.get(),
-                                            rescale_percent=self.rescaleVar.get(), ka=self.autotuneVar.get(),
-                                            random_pca=self.randomVar.get())
+        if self.data[name]['scdata'].logtrans is True:
+            raise ValueError("data cannot be log-transformed before running MAGIC")
+            self.magicProgress.destroy()
+        else:
+            if self.data[name]['scdata'].magic is None:
+                self.data[name]['scdata'].run_magic(n_pca_components=self.nCompVar.get() if self.nCompVar.get() > 0 else None,
+                                                t=self.tVar.get(), k=self.kVar.get(), epsilon=self.epsilonVar.get(),
+                                                rescale_percent=self.rescaleVar.get(), ka=self.autotuneVar.get(),
+                                                random_pca=self.randomVar.get())
 
-        self.data[name + ' MAGIC'] = {'scdata': self.data[name]['scdata'].magic, 'wb': None, 'state': tk.BooleanVar(),
-                                      'genes': self.data[name]['scdata'].magic.data.columns.values, 'gates': {}}
+            self.data[name + ' MAGIC'] = {'scdata': self.data[name]['scdata'].magic, 'wb': None, 'state': tk.BooleanVar(),
+                                          'genes': self.data[name]['scdata'].magic.data.columns.values, 'gates': {}}
 
-        self.data_list.insert(self.curKey, 'end', text=name + ' MAGIC' +
-                                                       ' (' + str(self.data[name]['scdata'].magic.data.shape[0]) +
-                                                       ' x ' + str(self.data[name]['scdata'].magic.data.shape[1]) + ')',
-                              open=True)
+            self.data_list.insert(self.curKey, 'end', text=name + ' MAGIC' +
+                                                           ' (' + str(self.data[name]['scdata'].magic.data.shape[0]) +
+                                                           ' x ' + str(self.data[name]['scdata'].magic.data.shape[1]) + ')',
+                                  open=True)
 
-        self.magicProgress.destroy()
+            self.magicProgress.destroy()
 
     def runPhenoGraph(self):
         for key in self.data_list.selection():
@@ -849,6 +848,9 @@ class magic_gui(tk.Tk):
                                   ' (' + str(self.data[name]['scdata'].diffusion_eigenvectors.shape[0]) + 
                                  ' x ' + str(self.data[name]['scdata'].diffusion_eigenvectors.shape[1]) + ')', open=True)
             self.DMOptions.destroy()
+            print(str(self.data[name]['scdata'].diffusion_eigenvectors.shape))
+            print(str(self.data[name]['scdata'].diffusion_eigenvalues.shape))
+            print(str(self.data[name]['scdata'].diffusion_map_correlations.shape))
 
     # already integrated into the PCA function
     def plotPCAVariance(self):
