@@ -485,6 +485,7 @@ class magic_gui(tk.Tk):
             """
             self.data_list.delete(key)
 
+    # updated, may need to be modified later
     def _updateSelection(self, event):
 
         self.data_detail.delete(*self.data_detail.get_children())
@@ -496,9 +497,7 @@ class magic_gui(tk.Tk):
             og = self.data[opseq[0]]['scdata']
             curdata = mg.SCData.retrieve_data(og, opseq)
 
-            magic = False
-            if 'MAGIC' in name:
-                magic = True
+            magic = True if'MAGIC' in name else False
 
             if 'PCA' in name:
                 for i in range(curdata.data.shape[1]):
@@ -508,16 +507,14 @@ class magic_gui(tk.Tk):
                         self.data_detail.insert('', 'end', text='PC' + str(i + 1), open=True)
 
             elif 'tSNE' in name:
-                data_set = name.split(' tSNE')[0]
-                for i in range(self.data[data_set]['scdata'].tsne.shape[1]):
+                for i in range(curdata.data.shape[1]):
                     if magic:
                         self.data_detail.insert('', 'end', text='MAGIC tSNE' + str(i + 1), open=True)
                     else:
                         self.data_detail.insert('', 'end', text='tSNE' + str(i + 1), open=True)
 
             elif 'Diffusion components' in name:
-                data_set = name.split(' Diffusion components')[0]
-                for i in range(len(self.data[data_set]['scdata'].diffusion_eigenvectors)):
+                for i in range(curdata.data.shape[1]):
                     if magic:
                         self.data_detail.insert('', 'end', text='MAGIC DC' + str(i + 1), open=True)
                     else:
@@ -553,64 +550,65 @@ class magic_gui(tk.Tk):
 
         self.wait_window(self.dataDistributions)
 
-    # work on this
+    # updated
     def runPCA(self):
-        self.pcaOptions = tk.Toplevel()
-        self.pcaOptions.title("PCA options")
-
-        tk.Label(self.pcaOptions, text=u"Number of components:", fg="black", bg="white").grid(column=0, row=0)
-        self.nComponents = tk.IntVar()
-        self.nComponents.set(20)
-        tk.Entry(self.pcaOptions, textvariable=self.nComponents).grid(column=1, row=0)
-
-        self.randomVar = tk.BooleanVar()
-        self.randomVar.set(True)
-        tk.Checkbutton(self.pcaOptions, text=u"Randomized PCA (faster)", variable=self.randomVar).grid(column=0, row=2,
-                                                                                                       columnspan=2)
-
-        tk.Button(self.pcaOptions, text="Run", command=self._runPCA).grid(column=1, row=4)
-        tk.Button(self.pcaOptions, text="Cancel", command=self.pcaOptions.destroy).grid(column=0, row=4)
-        self.wait_window(self.pcaOptions)
-
-    # work on this
-    def _runPCA(self):
         for key in self.data_list.selection():
-            curKey = self.data_list.item(key, 'text').split(' (')[0]
+            self.pcaOptions = tk.Toplevel()
+            self.pcaOptions.title("PCA options")
+            self.curKey = key
 
-            opseq = self._datafinder(self.data_list, self.data_list.selection())
-            og = self.data[opseq[0]]['scdata']
-            scobj = mg.SCData.retrieve_data(og, opseq)
+            tk.Label(self.pcaOptions, text=u"Number of components:", fg="black", bg="white").grid(column=0, row=0)
+            self.nComponents = tk.IntVar()
+            self.nComponents.set(20)
+            tk.Entry(self.pcaOptions, textvariable=self.nComponents).grid(column=1, row=0)
 
-            op_key = self._keygen(curKey, 'PCA', tuple(str(self.nComponents.get())))
+            self.randomVar = tk.BooleanVar()
+            self.randomVar.set(True)
+            tk.Checkbutton(self.pcaOptions, text=u"Randomized PCA (faster)", variable=self.randomVar).grid(column=0, row=2,
+                                                                                                           columnspan=2)
 
-            if op_key not in scobj.datadict:
-                pcadata = scobj.run_pca(n_components=self.nComponents.get(), rand=self.randomVar.get())
-            else:
-                pcadata = scobj.datadict[op_key]
+            tk.Button(self.pcaOptions, text="Run", command=self._runPCA).grid(column=1, row=4)
+            tk.Button(self.pcaOptions, text="Cancel", command=self.pcaOptions.destroy).grid(column=0, row=4)
+            self.wait_window(self.pcaOptions)
 
-            og = curKey if curKey.find(':') == -1 else curKey[:curKey.find(':')]
-            newkey = og + ':PCA:' + str(self.nComponents.get())
-            self.data_list.insert(key, 'end', text=newkey + ' (' + str(pcadata.data.shape[0]) +
-                                  ' x ' + str(pcadata.data.shape[1]) + ')', open=True)
+    # updated
+    def _runPCA(self):
+        curKey = self.data_list.item(self.curKey, 'text').split(' (')[0]
 
-            # plot component-variance plot with the input number of components
-            self.fig = plt.figure(figsize=[6, 6])
-            self.fig, self.ax = scobj.plot_pca_variance_explained(
-                n_components=self.nComponents.get(),
-                fig=self.fig,
-                random=self.randomVar.get())
+        opseq = self._datafinder(self.data_list, self.curKey)
+        og = self.data[opseq[0]]['scdata']
+        scobj = mg.SCData.retrieve_data(og, opseq)
 
-            self.tabs.append([tk.Frame(self.notebook), self.fig])
-            self.notebook.add(self.tabs[len(self.tabs) - 1][0], text='PCA plot')
+        op_key = self._keygen(curKey, 'PCA', tuple(str(self.nComponents.get())))
 
-            self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
-            self.canvas.show()
-            self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
+        if op_key not in scobj.datadict:
+            pcadata = scobj.run_pca(n_components=self.nComponents.get(), rand=self.randomVar.get())
+        else:
+            pcadata = scobj.datadict[op_key]
 
-            self.fileMenu.entryconfig(5, state='normal')
+        og = curKey if curKey.find(':') == -1 else curKey[:curKey.find(':')]
+        newkey = og + ':PCA:' + str(self.nComponents.get())
+        self.data_list.insert(self.curKey, 'end', text=newkey + ' (' + str(pcadata.data.shape[0]) +
+                              ' x ' + str(pcadata.data.shape[1]) + ')', open=True)
 
-            self.currentPlot = 'pca'
-            self.pcaOptions.destroy()
+        # plot component-variance plot with the input number of components
+        self.fig = plt.figure(figsize=[6, 6])
+        self.fig, self.ax = scobj.plot_pca_variance_explained(
+            n_components=self.nComponents.get(),
+            fig=self.fig,
+            random=self.randomVar.get())
+
+        self.tabs.append([tk.Frame(self.notebook), self.fig])
+        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text='PCA plot')
+
+        self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
+        self.canvas.show()
+        self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
+
+        self.fileMenu.entryconfig(5, state='normal')
+
+        self.currentPlot = 'pca'
+        self.pcaOptions.destroy()
 
     def runMagic(self):
         for key in self.data_list.selection():
@@ -665,7 +663,11 @@ class magic_gui(tk.Tk):
             self.wait_window(self.magicOptions)
 
     def _runMagic(self):
+        """
+            NEED TO ADD THE PCA DATASET
+        """
         name = self.data_list.item(self.curKey)['text'].split(' (')[0]
+        scdata = self.data[name]['scdata']
 
         self.magicOptions.destroy()
         self.magicProgress = tk.Toplevel()
@@ -674,28 +676,30 @@ class magic_gui(tk.Tk):
                                                                                                          row=0)
         self.magicProgress.update()
 
-        if self.data[name]['scdata'].logtrans is True:
-            raise ValueError("data cannot be log-transformed before running MAGIC")
-            self.magicProgress.destroy()
+        curKey = self.data_list.item(self.curKey, 'text').split(' (')[0]
+        og = curKey if curKey.find(':') == -1 else curKey[:curKey.find(':')]
+        parms = (str(self.nCompVar.get()), str(self.randomVar.get()), str(self.tVar.get()), str(self.kVar.get()),
+                 str(self.autotuneVar.get()), str(self.epsilonVar.get()), str(self.rescaleVar.get()))
+        newkey = self._keygen(og, 'MAGIC', parms)
+
+        for key in scdata.datadict.keys():
+            if 'LOGTRANS' in key:
+                self.magicProgress.destroy()
+                raise ValueError("data cannot be log-transformed before running MAGIC")
+
+        curMAGIC = [key for key in scdata.datadict.keys() if newkey==key]
+        if not curMAGIC:
+            magicsc = scdata.run_magic(n_pca_components=self.nCompVar.get() if self.nCompVar.get() > 0 else None,
+                                       t=self.tVar.get(), k=self.kVar.get(), epsilon=self.epsilonVar.get(),
+                                       rescale_percent=self.rescaleVar.get(), ka=self.autotuneVar.get(),
+                                       random_pca=self.randomVar.get())
         else:
-            if self.data[name]['scdata'].magic is None:
-                self.data[name]['scdata'].run_magic(
-                    n_pca_components=self.nCompVar.get() if self.nCompVar.get() > 0 else None,
-                    t=self.tVar.get(), k=self.kVar.get(), epsilon=self.epsilonVar.get(),
-                    rescale_percent=self.rescaleVar.get(), ka=self.autotuneVar.get(),
-                    random_pca=self.randomVar.get())
+            magicsc = scdata.datadict[curMAGIC[0]]
 
-            self.data[name + ' MAGIC'] = {'scdata': self.data[name]['scdata'].magic, 'wb': None,
-                                          'state': tk.BooleanVar(),
-                                          'genes': self.data[name]['scdata'].magic.data.columns.values, 'gates': {}}
+        self.data_list.insert(self.curKey, 'end', text=newkey + ' (' + str(magicsc.data.shape[0]) +
+                              ' x ' + str(magicsc.data.shape[1]) + ')', open=True)
 
-            self.data_list.insert(self.curKey, 'end', text=name + ' MAGIC' +
-                                                           ' (' + str(self.data[name]['scdata'].magic.data.shape[0]) +
-                                                           ' x ' + str(
-                self.data[name]['scdata'].magic.data.shape[1]) + ')',
-                                  open=True)
-
-            self.magicProgress.destroy()
+        self.magicProgress.destroy()
 
     def runPhenoGraph(self):
         for key in self.data_list.selection():
@@ -1351,7 +1355,7 @@ class magic_gui(tk.Tk):
 
     @staticmethod
     def _datafinder(tktree, curselection):
-        curID = curselection[0]
+        curID = curselection
         selname = tktree.item(curID)['text']
         selname = selname[:selname.find('(')-1]
         path = [selname]
