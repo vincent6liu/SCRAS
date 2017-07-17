@@ -40,7 +40,9 @@ from scipy.stats import gaussian_kde
 from scipy.io import mmread
 from numpy.core.umath_tests import inner1d
 import fcsparser
-import magic
+import sys
+sys.path.insert(0, '/Users/vincentliu/PycharmProjects/magic/src/magic')
+import MAGIC
 import phenograph
 
 # set plotting defaults
@@ -141,7 +143,7 @@ class SCData:
 
         # initiate the data dictionary with the given data
         self._name = name
-        cols = [np.array(['data'] * data.shape[1]), np.array(data.columns.values)]
+        cols = [np.array(data.columns.values)]
         self._datadict = {name: pd.DataFrame(data.values, index=data.index, columns=cols)}
         self._data_type = data_type
         self._metadata = metadata
@@ -249,12 +251,6 @@ class SCData:
 
         # Construct class object
         scdata = cls(data_name, df, data_type=data_type)
-
-        """
-        # Normalize if specified
-        if normalize:
-            scdata = scdata.normalize_scseq_data()
-        """
 
         return scdata
 
@@ -430,6 +426,8 @@ class SCData:
 
         self.datadict[key] = scdata
 
+        return scdata
+
     def run_pca(self, n_components=100, rand=True):
         """
         Principal component analysis of the data.
@@ -447,6 +445,8 @@ class SCData:
         scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
         scdata.operation.add('PCA', str(n_components))
         self.datadict[key] = scdata
+
+        return scdata
 
     def run_tsne(self, n_components=50, perplexity=30, n_iter=1000, theta=0.5):
         """ Run tSNE on the data. tSNE is run on the principal component projections
@@ -491,6 +491,8 @@ class SCData:
         scdata.operation.add('TSNE', par)
         pca_data.datadict[key] = scdata
 
+        return scdata
+
     def run_magic(self, n_pca_components=20, random_pca=True, t=6, k=30, ka=10, epsilon=1, rescale_percent=99):
         pca_keys = [pca_key for pca_key in self.datadict.keys() if 'PCA' in pca_key.upper()]
         comps = []
@@ -510,7 +512,7 @@ class SCData:
         else:
             pca_data = self
 
-        new_data = magic.MAGIC.magic(self.data.values, pca_data.data.values,
+        new_data = MAGIC.magic(self.data.values, pca_data.data.values,
                                      t=t, k=k, ka=ka, epsilon=epsilon, rescale=rescale_percent)
 
         new_data = pd.DataFrame(new_data, index=self.data.index, columns=self.data.columns)
@@ -522,6 +524,8 @@ class SCData:
         scdata = SCData(key, new_data, pca_data.data_type, pca_data.metadata, pca_data.operation)
         scdata.operation.add('MAGIC', par)
         pca_data.datadict[key] = scdata
+
+        return magic
 
     def run_diffusion_map(self, k=10, epsilon=1, distance_metric='euclidean',
                           n_diffusion_components=10, n_pca_components=15, ka=0, random_pca=True):
@@ -627,7 +631,9 @@ class SCData:
         key = pca_data.operation.history[0] + ":DM:" + par
         scdata = SCData(key, diffusion_eigenvectors, pca_data.data_type, pca_data.metadata, pca_data.operation)
         scdata.operation.add('DM', par)
-        pca_data.datadict[key] = scdat
+        pca_data.datadict[key] = scdata
+
+        return scdata
 
     def plot_molecules_per_cell_and_gene(self, fig=None, ax=None):
         if len(self.operation.history) != 1:
@@ -863,13 +869,13 @@ class SCData:
     def concatenate_data(self, other_data_sets, names=(), join='outer', axis=0):
 
         # concatenate dataframes
-        temp = self.data.deepcopy()
+        temp = deepcopy(self.data)
         if axis == 0:
             temp.index = [str(names[0]) + ' ' + str(i) for i in self.data.index]
         else:
             temp.columns = [str(names[0]) + ' ' + str(i) for i in self.data.columns]
 
-        self.datadict.clear()
+        self.datadict.clear()  # delete all derived SCData objects
         self.operation.clear()
 
         dfs = [temp]
@@ -891,6 +897,19 @@ class SCData:
         scdata = SCData(self.name + " concatenated", df_concat, self.data_type)
 
         return scdata
+
+    @classmethod
+    def retrieve_data(cls, original, opseq: list):
+        curscdata = original
+        for op in opseq[1:]:
+            try:
+                curscdata = curscdata.datadict[op]
+            except KeyError:
+                print(op)
+                print(curscdata.name)
+                print(curscdata.datadict.keys())
+
+        return curscdata
 
 
 class Tester(unittest.TestCase):
