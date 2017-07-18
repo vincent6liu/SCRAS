@@ -498,7 +498,7 @@ class magic_gui(tk.Tk):
         for key in self.data_list.selection():
             name = self.data_list.item(key)['text'].split(' (')[0]
 
-            opseq = self._datafinder(self.data_list, self.data_list.selection())
+            opseq = self._datafinder(self.data_list, key)
             og = self.data[opseq[0]]['scdata']
             curdata = mg.SCData.retrieve_data(og, opseq)
 
@@ -529,7 +529,7 @@ class magic_gui(tk.Tk):
                         self.data_detail.insert('', 'end', text='DC' + str(i + 1), open=True)
 
             else:
-                for gene in self.data[name]['scdata'].data:
+                for gene in curdata.data:
                     if magic:
                         self.data_detail.insert('', 'end', text='MAGIC ' + gene, open=True)
                     else:
@@ -675,38 +675,50 @@ class magic_gui(tk.Tk):
             self.wait_window(self.magicOptions)
 
     def _runMagic(self):
-        """
-            NEED TO ADD THE PCA DATASET
-        """
-        name = self.data_list.item(self.curKey)['text'].split(' (')[0]
-        scdata = self.data[name]['scdata']
+        # get the name of the currently selected dataset
+        curKey = self.data_list.item(self.curKey, 'text').split(' (')[0]
 
         self.magicOptions.destroy()
         self.magicProgress = tk.Toplevel()
-        self.magicProgress.title(name + ': Running MAGIC')
+        self.magicProgress.title(curKey + ': Running MAGIC')
         tk.Label(self.magicProgress, text="Running MAGIC - refer to console for progress updates.").grid(column=0,
                                                                                                          row=0)
         self.magicProgress.update()
 
-        curKey = self.data_list.item(self.curKey, 'text').split(' (')[0]
+        # find the operation sequence of the current dataset and use it to find the corresponding SCData object
+        opseq = self._datafinder(self.data_list, self.curKey)
+        og = self.data[opseq[0]]['scdata']
+        scobj = mg.SCData.retrieve_data(og, opseq)
+
+        # key of the current operation
         og = curKey if curKey.find(':') == -1 else curKey[:curKey.find(':')]
-        parms = (str(self.nCompVar.get()), str(self.randomVar.get()), str(self.tVar.get()), str(self.kVar.get()),
-                 str(self.autotuneVar.get()), str(self.epsilonVar.get()), str(self.rescaleVar.get()))
+        pca_key = self._keygen(og, 'PCA', [str(self.nCompVar.get())])
+
+        # run pca if the current operation hasn't been run; access the data otherwise
+        if pca_key not in scobj.datadict:
+            pcadata = scobj.run_pca(n_components=self.nCompVar.get(), rand=self.randomVar.get())
+            # insert the new key to the current tree view under the parent dataset
+            self.curKey = self.data_list.insert(self.curKey, 'end', text=pca_key + ' (' + str(pcadata.data.shape[0]) +
+                                                ' x ' + str(pcadata.data.shape[1]) + ')', open=True)
+        else:
+            pcadata = scobj.datadict[pca_key]
+            children = self.data_list.get_children(self.curKey)
+            for child in children:
+                item_name = self.data_list.item(child, 'text').split(' (')[0]
+                if pca_key in item_name:
+                    self.curKey = child
+
+        parms = (str(self.tVar.get()), str(self.kVar.get()), str(self.autotuneVar.get()),
+                 str(self.epsilonVar.get()), str(self.rescaleVar.get()))
         newkey = self._keygen(og, 'MAGIC', parms)
 
-        for key in scdata.datadict.keys():
-            if 'LOGTRANS' in key:
-                self.magicProgress.destroy()
-                raise ValueError("data cannot be log-transformed before running MAGIC")
-
-        curMAGIC = [key for key in scdata.datadict.keys() if newkey==key]
+        curMAGIC = [key for key in pcadata.datadict if newkey == key]
         if not curMAGIC:
-            magicsc = scdata.run_magic(n_pca_components=self.nCompVar.get() if self.nCompVar.get() > 0 else None,
-                                       t=self.tVar.get(), k=self.kVar.get(), epsilon=self.epsilonVar.get(),
-                                       rescale_percent=self.rescaleVar.get(), ka=self.autotuneVar.get(),
-                                       random_pca=self.randomVar.get())
+            magicsc = pcadata.run_magic(n_pca_components=0, t=self.tVar.get(), k=self.kVar.get(),
+                                        epsilon=self.epsilonVar.get(), rescale_percent=self.rescaleVar.get(),
+                                        ka=self.autotuneVar.get(), random_pca=self.randomVar.get())
         else:
-            magicsc = scdata.datadict[curMAGIC[0]]
+            magicsc = pcadata.datadict[newkey]
 
         self.data_list.insert(self.curKey, 'end', text=newkey + ' (' + str(magicsc.data.shape[0]) +
                               ' x ' + str(magicsc.data.shape[1]) + ')', open=True)
