@@ -340,14 +340,18 @@ class magic_gui(tk.Tk):
 
             self.data_detail = ttk.Treeview()
             self.data_detail.heading('#0', text='Features')
-            self.data_detail.grid(column=0, row=5, rowspan=7, sticky='NSEW')
+            self.data_detail.grid(column=0, row=6, rowspan=6, sticky='NSEW')
 
             ysb2 = ttk.Scrollbar(orient=tk.VERTICAL, command=self.data_detail.yview)
             xsb2 = ttk.Scrollbar(orient=tk.HORIZONTAL, command=self.data_detail.xview)
             self.data_detail.configure(yscroll=ysb2.set, xscroll=xsb2.set)
 
+            self.data_history = ttk.Treeview()
+            self.data_history.heading('#0', text='Data history')
+            self.data_history.grid(column=0, row=12, rowspan=2, sticky='NSEW')
+
             self.notebook = ttk.Notebook(height=600, width=600)
-            self.notebook.grid(column=1, row=0, rowspan=12, columnspan=4, sticky='NSEW')
+            self.notebook.grid(column=1, row=0, rowspan=14, columnspan=4, sticky='NSEW')
             self.tabs = []
 
         if file_type == 'csv':  # sc-seq data
@@ -489,6 +493,7 @@ class magic_gui(tk.Tk):
     def _updateSelection(self, event):
 
         self.data_detail.delete(*self.data_detail.get_children())
+        self.data_history.delete(*self.data_history.get_children())
 
         for key in self.data_list.selection():
             name = self.data_list.item(key)['text'].split(' (')[0]
@@ -496,6 +501,9 @@ class magic_gui(tk.Tk):
             opseq = self._datafinder(self.data_list, self.data_list.selection())
             og = self.data[opseq[0]]['scdata']
             curdata = mg.SCData.retrieve_data(og, opseq)
+
+            for op in curdata.operation.history:
+                self.data_history.insert('', 'end', text=op, open=True)
 
             magic = True if'MAGIC' in name else False
 
@@ -573,22 +581,26 @@ class magic_gui(tk.Tk):
 
     # updated
     def _runPCA(self):
+        # get the name of the currently selected dataset
         curKey = self.data_list.item(self.curKey, 'text').split(' (')[0]
 
+        # find the operation sequence of the current dataset and use it to find the corresponding SCData object
         opseq = self._datafinder(self.data_list, self.curKey)
         og = self.data[opseq[0]]['scdata']
         scobj = mg.SCData.retrieve_data(og, opseq)
 
-        op_key = self._keygen(curKey, 'PCA', tuple(str(self.nComponents.get())))
+        # key of the current operation
+        og = curKey if curKey.find(':') == -1 else curKey[:curKey.find(':')]
+        new_key = self._keygen(og, 'PCA', [str(self.nComponents.get())])
 
-        if op_key not in scobj.datadict:
+        # run pca if the current operation hasn't been run; access the data otherwise
+        if new_key not in scobj.datadict:
             pcadata = scobj.run_pca(n_components=self.nComponents.get(), rand=self.randomVar.get())
         else:
             pcadata = scobj.datadict[op_key]
 
-        og = curKey if curKey.find(':') == -1 else curKey[:curKey.find(':')]
-        newkey = og + ':PCA:' + str(self.nComponents.get())
-        self.data_list.insert(self.curKey, 'end', text=newkey + ' (' + str(pcadata.data.shape[0]) +
+        # insert the new key to the current tree view under the parent dataset
+        self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(pcadata.data.shape[0]) +
                               ' x ' + str(pcadata.data.shape[1]) + ')', open=True)
 
         # plot component-variance plot with the input number of components
@@ -1347,7 +1359,7 @@ class magic_gui(tk.Tk):
         del self.tabs[tab]
 
     @staticmethod
-    def _keygen(name: str, op: str, params: tuple):
+    def _keygen(name: str, op: str, params: list):
         par = params[0] if len(params) == 1 else "-".join(params)
         key = name + ':' + op + ':' + par
 
