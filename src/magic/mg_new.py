@@ -639,7 +639,6 @@ class SCData:
         scdata = SCData(key, diffusion_eigenvectors, pca_data.data_type, pca_data.metadata, pca_data.operation)
         scdata.operation.add('DM', par)
         pca_data.datadict[key] = scdata
-
         return scdata
 
     def plot_molecules_per_cell_and_gene(self, fig=None, ax=None):
@@ -710,8 +709,10 @@ class SCData:
         fontP = FontProperties()
         fontP.set_size('xx-small')
 
-        if self.operation.history[-1] != 'TSNE':
+        if 'TSNE' not in self.operation.history[-1]:
             print('must be run on a tSNE data set')
+            print(self.operation.history)
+            print(self.name)
             return
 
         tsne = self.data

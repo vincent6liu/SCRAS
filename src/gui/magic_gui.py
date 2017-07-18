@@ -858,8 +858,14 @@ class magic_gui(tk.Tk):
             self.tsneOptions = tk.Toplevel()
             self.curKey = key
             name = self.data_list.item(key)['text'].split(' (')[0]
+
+            # find the operation sequence of the current dataset and use it to find the corresponding SCData object
+            opseq = self._datafinder(self.data_list, self.curKey)
+            og = self.data[opseq[0]]['scdata']
+            scobj = mg.SCData.retrieve_data(og, opseq)
+
             self.tsneOptions.title(name + ": tSNE options")
-            if self.data[name]['scdata'].data_type == 'sc-seq':
+            if scobj.data_type == 'sc-seq':
                 tk.Label(self.tsneOptions, text=u"Number of components:", fg="black", bg="white").grid(column=0, row=0)
                 self.nCompVar = tk.IntVar()
                 self.nCompVar.set(50)
@@ -998,51 +1004,6 @@ class magic_gui(tk.Tk):
             print(str(self.data[name]['scdata'].diffusion_eigenvalues.shape))
             print(str(self.data[name]['scdata'].diffusion_map_correlations.shape))
 
-    # already integrated into the PCA function
-    def plotPCAVariance(self):
-        for key in self.data_list.selection():
-            # pop up for parameters
-            self.plotOptions = tk.Toplevel()
-            self.plotOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": PCA plot options")
-            self.curKey = key
-
-            tk.Label(self.plotOptions, text=u"# of PCA components:", fg="black", bg="white").grid(column=0, row=1)
-            self.nCompVar = tk.IntVar()
-            self.nCompVar.set(40)
-            tk.Entry(self.plotOptions, textvariable=self.nCompVar).grid(column=1, row=1)
-
-            self.randomVar = tk.BooleanVar()
-            self.randomVar.set(True)
-            tk.Checkbutton(self.plotOptions, text=u"Randomized PCA", variable=self.randomVar).grid(column=0, row=2,
-                                                                                                   columnspan=2)
-
-            tk.Button(self.plotOptions, text="Cancel", command=self.plotOptions.destroy).grid(column=0, row=3)
-            tk.Button(self.plotOptions, text="Run", command=self._plotPCAVariance).grid(column=1, row=3)
-            self.wait_window(self.plotOptions)
-
-    # already integrated into the PCA function
-    def _plotPCAVariance(self):
-        name = self.data_list.item(self.curKey)['text'].split(' (')[0]
-        self.fig = plt.figure(figsize=[6, 6])
-        self.fig, self.ax = self.data[name]['scdata'].plot_pca_variance_explained(n_components=self.nCompVar.get(),
-                                                                                  fig=self.fig,
-                                                                                  random=self.randomVar.get())
-
-        self.tabs.append([tk.Frame(self.notebook), self.fig])
-        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text='PCA plot')
-
-        self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
-        self.canvas.show()
-        self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
-
-        tk.Button(self.tabs[len(self.tabs) - 1][0], text="Save", command=self.savePlot).grid(row=0, column=5,
-                                                                                             sticky='NE')
-        tk.Button(self.tabs[len(self.tabs) - 1][0], text="Close tab", command=self.closeCurrentTab).grid(row=1,
-                                                                                                         column=5,
-                                                                                                         sticky='NE')
-        self.currentPlot = 'pca'
-        self.plotOptions.destroy()
-
     def plotPCA_DM(self):
         keys = self.data_list.selection()
         name = self.data_list.item(keys[0])['text'].split(' (')[0]
@@ -1123,8 +1084,10 @@ class magic_gui(tk.Tk):
     def plotTSNE(self):
         keys = self.data_list.selection()
         self.getScatterSelection(plot_type='tsne')
+        self.curKey = keys[0]
 
         self.colorSelection = self.colorVar.get().split(', ')
+
         if (len(self.colorSelection) == 1 and len(self.colorSelection[0]) > 0) or len(self.colorSelection) > 1:
             if len(self.colorSelection) == 1 and len(keys) == 1:
                 self.fig = plt.figure(figsize=[6 * len(self.colorSelection), 6 * len(keys)])
@@ -1132,7 +1095,21 @@ class magic_gui(tk.Tk):
                 self.fig = plt.figure(figsize=[4 * len(self.colorSelection), 4 * len(keys)])
             gs = gridspec.GridSpec(len(keys), len(self.colorSelection))
             for i in range(len(keys)):
-                name = self.data_list.item(keys[i])['text'].split(' (')[0]
+                # get the name of the currently selected dataset
+                name = self.data_list.item(self.curKey, 'text').split(' (')[0]
+
+                # find the operation sequence of the current dataset and use it to find the corresponding SCData object
+                opseq = self._datafinder(self.data_list, self.curKey)
+                og = self.data[opseq[0]]['scdata']
+                scobj = mg.SCData.retrieve_data(og, opseq)
+
+                self.ax = self.fig.add_subplot(gs[i, 0])
+                scobj.plot_tsne(fig=self.fig, ax=self.ax, color=self.colorSelection[0])
+                self.ax.set_title(name + ' (color =' + self.colorSelection[0] + ')')
+                self.ax.set_xlabel('tSNE1')
+                self.ax.set_ylabel('tSNE2')
+
+                """
                 if 'tSNE' in name:
                     name = name.split(' tSNE')[0]
                 for j in range(len(self.colorSelection)):
@@ -1160,9 +1137,11 @@ class magic_gui(tk.Tk):
                         self.data[name]['scdata'].plot_tsne(fig=self.fig, ax=self.ax, density=True)
                     else:
                         self.data[name]['scdata'].plot_tsne(fig=self.fig, ax=self.ax, color=self.colorSelection[j])
+                    
                     self.ax.set_title(name + ' (color =' + self.colorSelection[j] + ')')
                     self.ax.set_xlabel('tSNE1')
                     self.ax.set_ylabel('tSNE2')
+                """
             gs.tight_layout(self.fig)
 
             self.tabs.append([tk.Frame(self.notebook), self.fig])
@@ -1222,7 +1201,7 @@ class magic_gui(tk.Tk):
 
     def scatterPlot(self):
         keys = self.data_list.selection()
-        if 'tSNE' in self.data_list.item(keys[0])['text']:
+        if 'TSNE' in self.data_list.item(keys[0])['text']:
             self.plotTSNE()
         elif 'PCA' in self.data_list.item(keys[0])['text'] or 'Diffusion components' in self.data_list.item(keys[0])[
             'text']:
