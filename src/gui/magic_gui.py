@@ -582,7 +582,7 @@ class magic_gui(tk.Tk):
     # updated
     def _runPCA(self):
         # get the name of the currently selected dataset
-        curKey = self.data_list.item(self.curKey, 'text').split(' (')[0]
+        name = self.data_list.item(self.curKey, 'text').split(' (')[0]
 
         # find the operation sequence of the current dataset and use it to find the corresponding SCData object
         opseq = self._datafinder(self.data_list, self.curKey)
@@ -590,7 +590,7 @@ class magic_gui(tk.Tk):
         scobj = mg.SCData.retrieve_data(og, opseq)
 
         # key of the current operation
-        og = curKey if curKey.find(':') == -1 else curKey[:curKey.find(':')]
+        og = name if name.find(':') == -1 else name[:name.find(':')]
         new_key = self._keygen(og, 'PCA', [str(self.nComponents.get())])
 
         # run pca if the current operation hasn't been run; access the data otherwise
@@ -622,6 +622,7 @@ class magic_gui(tk.Tk):
         self.currentPlot = 'pca'
         self.pcaOptions.destroy()
 
+    # updated
     def runMagic(self):
         for key in self.data_list.selection():
             # pop up for parameters
@@ -674,9 +675,10 @@ class magic_gui(tk.Tk):
             tk.Button(self.magicOptions, text="Run", command=self._runMagic).grid(column=1, row=10)
             self.wait_window(self.magicOptions)
 
+    # updated
     def _runMagic(self):
         # get the name of the currently selected dataset
-        curKey = self.data_list.item(self.curKey, 'text').split(' (')[0]
+        name = self.data_list.item(self.curKey, 'text').split(' (')[0]
 
         self.magicOptions.destroy()
         self.magicProgress = tk.Toplevel()
@@ -705,7 +707,7 @@ class magic_gui(tk.Tk):
                 if pca_key in item_name:
                     self.curKey = child
         """
-        og_name = curKey if curKey.find(':') == -1 else curKey[:curKey.find(':')]
+        og_name = name if name.find(':') == -1 else name[:name.find(':')]
         parms = [str(self.nCompVar.get()), str(self.randomVar.get()), str(self.tVar.get()), str(self.kVar.get()),
                  str(self.autotuneVar.get()), str(self.epsilonVar.get()), str(self.rescaleVar.get())]
         newkey = self._keygen(og_name, 'MAGIC', parms)
@@ -882,20 +884,50 @@ class magic_gui(tk.Tk):
             tk.Button(self.tsneOptions, text="Cancel", command=self.tsneOptions.destroy).grid(column=0, row=4)
             self.wait_window(self.tsneOptions)
 
+    # updated
     def _runTSNE(self):
-        name = self.data_list.item(self.curKey)['text'].split(' (')[0]
-        if self.data[name]['scdata'].tsne is None:
-            self.data[name]['scdata'].run_tsne(n_components=self.nCompVar.get(), perplexity=self.perplexityVar.get(),
-                                               n_iter=self.iterVar.get(), theta=self.angleVar.get())
-        self.data[name]['gates'] = {}
+        # get the name of the currently selected dataset
+        name = self.data_list.item(self.curKey, 'text').split(' (')[0]
+
+        # find the operation sequence of the current dataset and use it to find the corresponding SCData object
+        opseq = self._datafinder(self.data_list, self.curKey)
+        og = self.data[opseq[0]]['scdata']
+        scobj = mg.SCData.retrieve_data(og, opseq)
+
+        # keys of the current operation
+        og = name if name.find(':') == -1 else name[:name.find(':')]
+        new_key = self._keygen(og, 'TSNE', [str(self.perplexityVar.get()), str(self.iterVar.get()),
+                                            str(self.angleVar.get())])
+        pca_key = self._keygen(og, 'PCA', [str(self.nCompVar.get())])
+
+        # run pca if the current operation hasn't been run; access the data otherwise
+        if self.nCompVar.get() == 0:
+            pcadata = scobj
+        elif pca_key not in scobj.datadict:
+            pcadata = scobj.run_pca(n_components=self.nCompVar.get())
+            # insert the new key to the current tree view under the parent dataset
+            self.curKey = self.data_list.insert(self.curKey, 'end', text=pca_key + ' (' + str(pcadata.data.shape[0]) +
+                                                ' x ' + str(pcadata.data.shape[1]) + ')', open=True)
+        else:
+            pcadata = scobj.datadict[pca_key]
+            children = self.data_list.get_children(self.curKey)
+            for child in children:
+                item_name = self.data_list.item(child, 'text').split(' (')[0]
+                if pca_key in item_name:
+                    self.curKey = child
+
+        # run pca if the current operation hasn't been run; access the data otherwise
+        if new_key not in pcadata.datadict:
+            tsnedata = pcadata.run_tsne(self.perplexityVar.get(), self.iterVar.get(), self.angleVar.get())
+        else:
+            tsnedata = pcadata.datadict[new_key]
+
+        # insert the new key to the current tree view under the parent dataset
+        self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(tsnedata.data.shape[0]) +
+                                                       ' x ' + str(tsnedata.data.shape[1]) + ')', open=True)
 
         # enable buttons
         self.analysisMenu.entryconfig(2, state='normal')
-
-        self.data_list.insert(self.curKey, 'end', text=name + ' tSNE' +
-                                                       ' (' + str(self.data[name]['scdata'].tsne.shape[0]) +
-                                                       ' x ' + str(self.data[name]['scdata'].tsne.shape[1]) + ')',
-                              open=True)
         self.plotTSNE()
         self.tsneOptions.destroy()
 

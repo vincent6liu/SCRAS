@@ -144,7 +144,7 @@ class SCData:
         # initiate the data dictionary with the given data
         self._name = name
         cols = [np.array(data.columns.values)]
-        self._datadict = {name+' original': pd.DataFrame(data.values, index=data.index, columns=cols)}
+        self._datadict = {'original '+name: pd.DataFrame(data.values, index=data.index, columns=cols)}
         self._data_type = data_type
         self._metadata = metadata
 
@@ -203,14 +203,14 @@ class SCData:
     # returns the raw or normalized data
     @property
     def data(self):
-        return self._datadict[self.name+' original']
+        return self._datadict['original '+self.name]
 
     @data.setter
     def data(self, item):
         if not (isinstance(item, pd.DataFrame)):
             raise TypeError('SCData.data must be of type DataFrame')
         cols = [np.array(item.columns.values)]
-        self._datadict = {self.name+' original': pd.DataFrame(item.values, index=item.index, columns=cols)}
+        self._datadict = {'original '+self.name: pd.DataFrame(item.values, index=item.index, columns=cols)}
         self.reset()
 
     @property
@@ -448,7 +448,7 @@ class SCData:
 
         return scdata
 
-    def run_tsne(self, n_components=50, perplexity=30, n_iter=1000, theta=0.5):
+    def run_tsne(self, perplexity=30, n_iter=1000, theta=0.5):
         """ Run tSNE on the data. tSNE is run on the principal component projections
         for single cell RNA-seq data and on the expression matrix for mass cytometry data
         stored in the data dictionary as "name:TSNE:comp-perp-iter-theta"
@@ -458,38 +458,41 @@ class SCData:
         :return: None
         """
         pca_keys = [pca_key for pca_key in self.datadict.keys() if 'PCA' in pca_key.upper()]
-        comps = []
+        og_name = self.name if self.name.find(':') == -1 else self.name[:self.name.find(':')]
+
+        comps, low_comp = [], self.data.shape[1]
         if bool(pca_keys):
+            print(pca_keys)
             comps = sorted([int(key[key.rfind(':') + 1:]) for key in pca_keys])
             low_comp = min(comps)
 
+        """
         # Work on PCA projections if data is single cell RNA-seq
-        if self.data_type == 'sc-seq':
+        if self.data_type == 'sc-seq' and n_components > 0:
             if n_components in comps:
-                pca_data = self.datadict[(self.name + ":PCA:" + str(n_components))]
+                pca_data = self.datadict[(og_name + ":PCA:" + str(n_components))]
             elif (not bool(pca_keys)) or n_components > low_comp:
                 self.run_pca(n_components=n_components)
-                pca_data = self.datadict[(self.name + ":PCA:" + str(n_components))]
+                pca_data = self.datadict[(og_name + ":PCA:" + str(n_components))]
             else:  # n_components <= low_comp
-                pca_data = self.datadict[(self.name + ":PCA:" + str(low_comp))].iloc[:, :n_components]
+                pca_data = self.datadict[(og_name + ":PCA:" + str(low_comp))].iloc[:, :n_components]
         else:
             pca_data = self
+        """
 
         # Reduce perplexity if necessary
         perplexity_limit = 15
-        if pca_data.data.shape[0] < 100 and perplexity > perplexity_limit:
+        if self.data.shape[0] < 100 and perplexity > perplexity_limit:
             print('Reducing perplexity to %d since there are <100 cells in the dataset. ' % perplexity_limit)
-        tsne = TSNE(n_components=2, perplexity=perplexity, init='random', random_state=sum(pca_data.data.shape),
-                    n_iter=n_iter,
-                    angle=theta)
+        tsne = TSNE(n_components=2, perplexity=perplexity, init='random', random_state=sum(self.data.shape),
+                    n_iter=n_iter, angle=float(theta))
 
-        new_data = pd.DataFrame(tsne.fit_transform(pca_data.data),
-                                index=self.data.index, columns=['tSNE1', 'tSNE2'])
-        par = "-".join((str(n_components), str(perplexity), str(n_iter), str(theta)))
-        key = pca_data.operation.history[0] + ":TSNE:" + par
-        scdata = SCData(key, new_data, pca_data.data_type, pca_data.metadata, pca_data.operation)
+        new_data = pd.DataFrame(tsne.fit_transform(self.data), index=self.data.index, columns=['tSNE1', 'tSNE2'])
+        par = "-".join((str(perplexity), str(n_iter), str(theta)))
+        key = og_name + ":TSNE:" + par
+        scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
         scdata.operation.add('TSNE', par)
-        pca_data.datadict[key] = scdata
+        self.datadict[key] = scdata
 
         return scdata
 
