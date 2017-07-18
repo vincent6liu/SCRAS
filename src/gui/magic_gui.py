@@ -690,10 +690,7 @@ class magic_gui(tk.Tk):
         og = self.data[opseq[0]]['scdata']
         scobj = mg.SCData.retrieve_data(og, opseq)
 
-        # key of the current operation
-        og = curKey if curKey.find(':') == -1 else curKey[:curKey.find(':')]
-        pca_key = self._keygen(og, 'PCA', [str(self.nCompVar.get())])
-
+        """
         # run pca if the current operation hasn't been run; access the data otherwise
         if pca_key not in scobj.datadict:
             pcadata = scobj.run_pca(n_components=self.nCompVar.get(), rand=self.randomVar.get())
@@ -707,18 +704,19 @@ class magic_gui(tk.Tk):
                 item_name = self.data_list.item(child, 'text').split(' (')[0]
                 if pca_key in item_name:
                     self.curKey = child
+        """
+        og_name = curKey if curKey.find(':') == -1 else curKey[:curKey.find(':')]
+        parms = [str(self.nCompVar.get()), str(self.randomVar.get()), str(self.tVar.get()), str(self.kVar.get()),
+                 str(self.autotuneVar.get()), str(self.epsilonVar.get()), str(self.rescaleVar.get())]
+        newkey = self._keygen(og_name, 'MAGIC', parms)
 
-        parms = (str(self.tVar.get()), str(self.kVar.get()), str(self.autotuneVar.get()),
-                 str(self.epsilonVar.get()), str(self.rescaleVar.get()))
-        newkey = self._keygen(og, 'MAGIC', parms)
-
-        curMAGIC = [key for key in pcadata.datadict if newkey == key]
+        curMAGIC = [key for key in scobj.datadict if newkey == key]
         if not curMAGIC:
-            magicsc = pcadata.run_magic(n_pca_components=0, t=self.tVar.get(), k=self.kVar.get(),
+            magicsc = scobj.run_magic(n_pca_components=self.nCompVar.get(), t=self.tVar.get(), k=self.kVar.get(),
                                         epsilon=self.epsilonVar.get(), rescale_percent=self.rescaleVar.get(),
                                         ka=self.autotuneVar.get(), random_pca=self.randomVar.get())
         else:
-            magicsc = pcadata.datadict[newkey]
+            magicsc = scobj.datadict[newkey]
 
         self.data_list.insert(self.curKey, 'end', text=newkey + ' (' + str(magicsc.data.shape[0]) +
                               ' x ' + str(magicsc.data.shape[1]) + ')', open=True)

@@ -513,16 +513,16 @@ class SCData:
             pca_data = self
 
         new_data = MAGIC.magic(self.data.values, pca_data.data.values,
-                                     t=t, k=k, ka=ka, epsilon=epsilon, rescale=rescale_percent)
-
+                               t=t, k=k, ka=ka, epsilon=epsilon, rescale=rescale_percent)
         new_data = pd.DataFrame(new_data, index=self.data.index, columns=self.data.columns)
 
         # Construct class object
-        par = '-'.join((str(t), str(k), str(ka), str(epsilon), str(rescale_percent)))
+        par = '-'.join((str(n_pca_components), str(random_pca), str(t), str(k),
+                        str(ka), str(epsilon), str(rescale_percent)))
         key = pca_data.operation.history[0] + ":MAGIC:" + par
-        scdata = SCData(key, new_data, pca_data.data_type, pca_data.metadata, pca_data.operation)
+        scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
         scdata.operation.add('MAGIC', par)
-        pca_data.datadict[key] = scdata
+        self.datadict[key] = scdata
 
         return scdata
 
