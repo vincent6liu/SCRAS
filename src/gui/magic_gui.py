@@ -711,12 +711,21 @@ class magic_gui(tk.Tk):
         newkey = self._keygen(og_name, 'MAGIC', parms)
 
         curMAGIC = [key for key in scobj.datadict if newkey == key]
+
         if not curMAGIC:
-            magicsc = scobj.run_magic(n_pca_components=self.nCompVar.get(), t=self.tVar.get(), k=self.kVar.get(),
+            magicsc, newpca = scobj.run_magic(n_pca_components=self.nCompVar.get(), t=self.tVar.get(), k=self.kVar.get(),
                                         epsilon=self.epsilonVar.get(), rescale_percent=self.rescaleVar.get(),
                                         ka=self.autotuneVar.get(), random_pca=self.randomVar.get())
+            if newpca:
+                pcakey = self._keygen(og_name, 'PCA', [str(self.nCompVar.get())])
+                self.data_list.insert(self.curKey, 'end', text=pcakey + ' (' + str(scobj.data.shape[0]) +
+                                      ' x ' + str(self.nCompVar.get()) + ')', open=True)
         else:
             magicsc = scobj.datadict[newkey]
+            print('\nreached here\n')
+            print(type(magicsc))
+            print(type(scobj))
+            print(magicsc)
 
         self.data_list.insert(self.curKey, 'end', text=newkey + ' (' + str(magicsc.data.shape[0]) +
                               ' x ' + str(magicsc.data.shape[1]) + ')', open=True)

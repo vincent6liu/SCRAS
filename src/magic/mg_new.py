@@ -144,7 +144,7 @@ class SCData:
         # initiate the data dictionary with the given data
         self._name = name
         cols = [np.array(data.columns.values)]
-        self._datadict = {name: pd.DataFrame(data.values, index=data.index, columns=cols)}
+        self._datadict = {name+' original': pd.DataFrame(data.values, index=data.index, columns=cols)}
         self._data_type = data_type
         self._metadata = metadata
 
@@ -203,14 +203,14 @@ class SCData:
     # returns the raw or normalized data
     @property
     def data(self):
-        return self._datadict[self.name]
+        return self._datadict[self.name+' original']
 
     @data.setter
     def data(self, item):
         if not (isinstance(item, pd.DataFrame)):
             raise TypeError('SCData.data must be of type DataFrame')
-        cols = [np.array(['data'] * item.shape[1]), np.array(item.columns.values)]
-        self._datadict = {self.name: pd.DataFrame(item.values, index=item.index, columns=cols)}
+        cols = [np.array(item.columns.values)]
+        self._datadict = {self.name+' original': pd.DataFrame(item.values, index=item.index, columns=cols)}
         self.reset()
 
     @property
@@ -235,7 +235,7 @@ class SCData:
 
     @classmethod
     def from_csv(cls, counts_csv_file, data_name: str, data_type='sc-seq', cell_axis=0, delimiter=',',
-                 rows_after_header_to_skip=0, cols_after_header_to_skip=0, normalize=True):
+                 rows_after_header_to_skip=0, cols_after_header_to_skip=0):
 
         if data_type not in ['sc-seq', 'masscyt']:
             raise RuntimeError('data_type must be either sc-seq or masscyt')
@@ -376,12 +376,12 @@ class SCData:
             pass
         else:
             molecule_counts = self.data.sum(axis=1)
-            self._datadict[self.name] = self.data.div(molecule_counts, axis=0) \
+            self.data = self.data.div(molecule_counts, axis=0) \
                 .mul(np.median(molecule_counts), axis=0)
 
             # check that none of the genes are empty; if so remove them
             nonzero_genes = self.data.sum(axis=0) != 0
-            self._datadict[self.name] = self.data.loc[:, nonzero_genes].astype(np.float32)
+            self.data = self.data.loc[:, nonzero_genes].astype(np.float32)
 
             # set unnormalized_cell_sums
             self.library_sizes = molecule_counts
@@ -494,6 +494,10 @@ class SCData:
         return scdata
 
     def run_magic(self, n_pca_components=20, random_pca=True, t=6, k=30, ka=10, epsilon=1, rescale_percent=99):
+
+        newpca = False
+        og_name = self.name if self.name.find(':') == -1 else self.name[:self.name.find(':')]
+
         pca_keys = [pca_key for pca_key in self.datadict.keys() if 'PCA' in pca_key.upper()]
         comps = []
         if bool(pca_keys):
@@ -503,12 +507,13 @@ class SCData:
         # Work on PCA projections if data is single cell RNA-seq
         if self.data_type == 'sc-seq' and n_pca_components > 0:
             if n_pca_components in comps:
-                pca_data = self.datadict[(self.name + ":PCA:" + str(n_pca_components))]
+                pca_data = self.datadict[(og_name + ":PCA:" + str(n_pca_components))]
             elif (not bool(pca_keys)) or n_pca_components > low_comp:
                 self.run_pca(n_components=n_pca_components)
-                pca_data = self.datadict[(self.name + ":PCA:" + str(n_pca_components))]
+                newpca = True
+                pca_data = self.datadict[(og_name + ":PCA:" + str(n_pca_components))]
             else:  # n_components <= low_comp
-                pca_data = self.datadict[(self.name + ":PCA:" + str(low_comp))].iloc[:, :n_pca_components]
+                pca_data = self.datadict[(og_name + ":PCA:" + str(low_comp))].iloc[:, :n_pca_components]
         else:
             pca_data = self
 
@@ -524,7 +529,7 @@ class SCData:
         scdata.operation.add('MAGIC', par)
         self.datadict[key] = scdata
 
-        return scdata
+        return scdata, newpca
 
     def run_diffusion_map(self, k=10, epsilon=1, distance_metric='euclidean',
                           n_diffusion_components=10, n_pca_components=15, ka=0, random_pca=True):
