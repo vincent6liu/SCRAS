@@ -790,12 +790,10 @@ class SCData:
                       'wrong symbols were used.')
             return
 
-        if len(genes) < 2 or len(genes) > 3:
+        if len(genes) not in [2, 3]:
             raise RuntimeError('Please specify either 2 or 3 genes to scatter.')
 
-        gui_3d_flag = True
-        if ax is None:
-            gui_3d_flag = False
+        gui_3d_flag = False if ax is None else True
 
         x, y = self.data[genes[0]].to_frame(), self.data[genes[1]].to_frame()
 

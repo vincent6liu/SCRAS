@@ -911,6 +911,7 @@ class magic_gui(tk.Tk):
             pcadata = scobj
         elif pca_key not in scobj.datadict:
             pcadata = scobj.run_pca(n_components=self.nCompVar.get())
+
             # insert the new key to the current tree view under the parent dataset
             self.curKey = self.data_list.insert(self.curKey, 'end', text=pca_key + ' (' + str(pcadata.data.shape[0]) +
                                                 ' x ' + str(pcadata.data.shape[1]) + ')', open=True)
@@ -922,15 +923,15 @@ class magic_gui(tk.Tk):
                 if pca_key in item_name:
                     self.curKey = child
 
-        # run pca if the current operation hasn't been run; access the data otherwise
+        # run tsne if the current operation hasn't been run; access the data otherwise
         if new_key not in pcadata.datadict:
             tsnedata = pcadata.run_tsne(self.perplexityVar.get(), self.iterVar.get(), self.angleVar.get())
         else:
             tsnedata = pcadata.datadict[new_key]
 
         # insert the new key to the current tree view under the parent dataset
-        self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(tsnedata.data.shape[0]) +
-                                                       ' x ' + str(tsnedata.data.shape[1]) + ')', open=True)
+        self.curKey = self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(tsnedata.data.shape[0]) +
+                                           ' x ' + str(tsnedata.data.shape[1]) + ')', open=True)
 
         # enable buttons
         self.analysisMenu.entryconfig(2, state='normal')
@@ -1084,7 +1085,7 @@ class magic_gui(tk.Tk):
     def plotTSNE(self):
         keys = self.data_list.selection()
         self.getScatterSelection(plot_type='tsne')
-        self.curKey = keys[0]
+        # self.curKey = keys[0]
 
         self.colorSelection = self.colorVar.get().split(', ')
 
@@ -1201,85 +1202,88 @@ class magic_gui(tk.Tk):
 
     def scatterPlot(self):
         keys = self.data_list.selection()
-        if 'TSNE' in self.data_list.item(keys[0])['text']:
-            self.plotTSNE()
-        elif 'PCA' in self.data_list.item(keys[0])['text'] or 'Diffusion components' in self.data_list.item(keys[0])[
-            'text']:
-            self.plotPCA_DM()
-        else:
-            self.getScatterSelection()
-            xSelection = self.xVar.get().split(', ')
-            ySelection = self.yVar.get().split(', ')
-            zSelection = self.zVar.get().split(', ')
-            colorSelection = self.colorVar.get().split(', ')
-            if len(xSelection[0]) > 0 and len(ySelection[0]) > 0 and len(xSelection) == len(ySelection):
-                if len(colorSelection) == 1 and len(colorSelection) != len(xSelection):
-                    colorSelection = np.repeat(colorSelection, len(xSelection))
+        for key in keys:
+            data_name = self.data_list.item(key)['text']
+            self.curKey = key
+            if 'TSNE' in data_name:
+                self.plotTSNE()
+            elif 'PCA' in data_name or 'Diffusion components' in data_name:
+                self.plotPCA_DM()
+            else:
+                self.getScatterSelection()
+                xSelection = self.xVar.get().split(', ')
+                ySelection = self.yVar.get().split(', ')
+                zSelection = self.zVar.get().split(', ')
+                colorSelection = self.colorVar.get().split(', ')
+                if len(xSelection[0]) > 0 and len(ySelection[0]) > 0 and len(xSelection) == len(ySelection):
+                    if len(colorSelection) == 1 and len(colorSelection) != len(xSelection):
+                        colorSelection = np.repeat(colorSelection, len(xSelection))
 
-                keys = self.data_list.selection()
-                if len(xSelection) == 1 and len(keys) == 1:
-                    self.fig = plt.figure(figsize=[6 * len(xSelection), 6 * len(keys)])
-                else:
-                    self.fig = plt.figure(figsize=[4 * len(xSelection), 4 * len(keys)])
-                gs = gridspec.GridSpec(len(keys), len(xSelection))
-                self.ax = []
-                for i in range(len(keys)):
-                    name = self.data_list.item(keys[i])['text'].split(' (')[0]
+                    keys = self.data_list.selection()
+                    if len(xSelection) == 1 and len(keys) == 1:
+                        self.fig = plt.figure(figsize=[6 * len(xSelection), 6 * len(keys)])
+                    else:
+                        self.fig = plt.figure(figsize=[4 * len(xSelection), 4 * len(keys)])
+                    gs = gridspec.GridSpec(len(keys), len(xSelection))
+                    self.ax = []
+                    for i in range(len(keys)):
+                        name = self.data_list.item(keys[i])['text'].split(' (')[0]
 
-                    for j in range(len(xSelection)):
+                        for j in range(len(xSelection)):
 
-                        if len(zSelection[0]) > 0 and len(zSelection) == len(xSelection):
-                            self.ax.append(self.fig.add_subplot(gs[i, j], projection='3d'))
-                            genes = [xSelection[j], ySelection[j], zSelection[j]]
-                        else:
-                            self.ax.append(self.fig.add_subplot(gs[i, j]))
-                            genes = [xSelection[j], ySelection[j]]
+                            if len(zSelection[0]) > 0 and len(zSelection) == len(xSelection):
+                                self.ax.append(self.fig.add_subplot(gs[i, j], projection='3d'))
+                                genes = [xSelection[j], ySelection[j], zSelection[j]]
+                            else:
+                                self.ax.append(self.fig.add_subplot(gs[i, j]))
+                                genes = [xSelection[j], ySelection[j]]
 
-                        if colorSelection[j] in self.data[name]['scdata'].extended_data.columns.get_level_values(1):
-                            self.data[name]['scdata'].scatter_gene_expression(genes, fig=self.fig,
-                                                                              ax=self.ax[len(self.ax) - 1],
-                                                                              color=colorSelection[j])
-                        elif 'MAGIC' in colorSelection[j]:
-                            color = colorSelection[j].split('MAGIC ')[0]
-                            if color in self.data[name]['scdata'].magic.data.columns:
+                            if colorSelection[j] in self.data[name]['scdata'].extended_data.columns.get_level_values(1):
                                 self.data[name]['scdata'].scatter_gene_expression(genes, fig=self.fig,
                                                                                   ax=self.ax[len(self.ax) - 1],
-                                                                                  color=
-                                                                                  self.data[name]['scdata'].magic.data[
-                                                                                      color])
+                                                                                  color=colorSelection[j])
+                            elif 'MAGIC' in colorSelection[j]:
+                                color = colorSelection[j].split('MAGIC ')[0]
+                                if color in self.data[name]['scdata'].magic.data.columns:
+                                    self.data[name]['scdata'].scatter_gene_expression(genes, fig=self.fig,
+                                                                                      ax=self.ax[len(self.ax) - 1],
+                                                                                      color=
+                                                                                      self.data[name]['scdata'].magic.data[
+                                                                                          color])
 
-                        elif colorSelection[j] == 'density':
-                            self.data[name]['scdata'].scatter_gene_expression(genes, fig=self.fig,
-                                                                              ax=self.ax[len(self.ax) - 1],
-                                                                              density=True)
-                        else:
-                            self.data[name]['scdata'].scatter_gene_expression(genes, fig=self.fig,
-                                                                              ax=self.ax[len(self.ax) - 1],
-                                                                              color=colorSelection[j])
-                        self.ax[len(self.ax) - 1].set_title(name + ' (color = ' + colorSelection[j] + ')')
-                        self.ax[len(self.ax) - 1].set_xlabel(' '.join(genes[0]))
-                        self.ax[len(self.ax) - 1].set_ylabel(' '.join(genes[1]))
-                        if len(genes) == 3:
-                            self.ax[len(self.ax) - 1].set_zlabel(' '.join(genes[2]))
+                            elif colorSelection[j] == 'density':
+                                self.data[name]['scdata'].scatter_gene_expression(genes, fig=self.fig,
+                                                                                  ax=self.ax[len(self.ax) - 1],
+                                                                                  density=True)
+                            else:
+                                self.data[name]['scdata'].scatter_gene_expression(genes, fig=self.fig,
+                                                                                  ax=self.ax[len(self.ax) - 1],
+                                                                                  color=colorSelection[j])
+                            self.ax[len(self.ax) - 1].set_title(name + ' (color = ' + colorSelection[j] + ')')
+                            self.ax[len(self.ax) - 1].set_xlabel(' '.join(genes[0]))
+                            self.ax[len(self.ax) - 1].set_ylabel(' '.join(genes[1]))
+                            if len(genes) == 3:
+                                self.ax[len(self.ax) - 1].set_zlabel(' '.join(genes[2]))
 
-                gs.tight_layout(self.fig)
+                    gs.tight_layout(self.fig)
 
-                self.tabs.append([tk.Frame(self.notebook), self.fig])
-                self.notebook.add(self.tabs[len(self.tabs) - 1][0], text=self.plotNameVar.get())
+                    self.tabs.append([tk.Frame(self.notebook), self.fig])
+                    self.notebook.add(self.tabs[len(self.tabs) - 1][0], text=self.plotNameVar.get())
 
-                self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
-                self.canvas.show()
-                self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
+                    self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
+                    self.canvas.show()
+                    self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
-                self.fileMenu.entryconfig(5, state='normal')
+                    self.fileMenu.entryconfig(5, state='normal')
 
-                if len(zSelection[0]) > 0 and len(zSelection) == len(xSelection):
-                    for ax in self.ax:
-                        ax.mouse_init()
-                self.currentPlot = 'scatter'
-            else:
-                print(
-                    'Error: must select at least one gene for x and y. x and y must also have the same number of selections.')
+                    if len(zSelection[0]) > 0 and len(zSelection) == len(xSelection):
+                        for ax in self.ax:
+                            ax.mouse_init()
+                    self.currentPlot = 'scatter'
+                else:
+                    print(
+                        'Error: must select at least one gene for x and y. x and y must '
+                        'also have the same number of selections.')
 
     def getScatterSelection(self, plot_type='', options=None):
         # popup menu for scatter plot selections
