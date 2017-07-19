@@ -782,6 +782,7 @@ class SCData:
 
         not_in_dataframe = set(genes).difference(self.data.columns)
 
+        print(genes)
         if not_in_dataframe:
             if len(not_in_dataframe) < len(genes):
                 print('The following genes were either not observed in the experiment, '
@@ -862,7 +863,7 @@ class SCData:
                 p = ax.scatter(x, y, z,
                                edgecolors='none', s=size, color=qualitative_colors(2)[1] if color is None else color)
                 ax.set_title('Color = ')
-                fig.colorbar(p)
+                # fig.colorbar(p)
 
             ax.set_xlabel(genes[0][1])
             ax.set_ylabel(genes[1][1])

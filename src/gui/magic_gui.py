@@ -521,7 +521,7 @@ class magic_gui(tk.Tk):
                     else:
                         self.data_detail.insert('', 'end', text='tSNE' + str(i + 1), open=True)
 
-            elif 'Diffusion components' in name:
+            elif 'DM' in name:
                 for i in range(curdata.data.shape[1]):
                     if magic:
                         self.data_detail.insert('', 'end', text='MAGIC DC' + str(i + 1), open=True)
@@ -939,6 +939,7 @@ class magic_gui(tk.Tk):
         self.plotTSNE()
         self.tsneOptions.destroy()
 
+    # updated
     def runDM(self):
         for key in self.data_list.selection():
             # pop up for # components
@@ -992,6 +993,7 @@ class magic_gui(tk.Tk):
             tk.Button(self.DMOptions, text="Cancel", command=self.DMOptions.destroy).grid(column=0, row=8)
             self.wait_window(self.DMOptions)
 
+    # updated
     def _runDM(self):
         # get the name of the currently selected dataset
         name = self.data_list.item(self.curKey, 'text').split(' (')[0]
@@ -1042,23 +1044,31 @@ class magic_gui(tk.Tk):
     def plotPCA_DM(self):
         keys = self.data_list.selection()
         name = self.data_list.item(keys[0])['text'].split(' (')[0]
+        print(name)
         plot_type = ''
         if 'PCA' in name:
             plot_type = 'PCA'
-        elif 'Diffusion components' in name:
+        elif 'DM' in name:
             plot_type = 'Diffusion components'
-        name = name.split(' ' + plot_type)[0]
+
+        # get the name of the currently selected dataset
+        name = self.data_list.item(self.curKey, 'text').split(' (')[0]
+
+        # find the operation sequence of the current dataset and use it to find the corresponding SCData object
+        opseq = self._datafinder(self.data_list, self.curKey)
+        og = self.data[opseq[0]]['scdata']
+        scobj = mg.SCData.retrieve_data(og, opseq)
 
         self.getScatterSelection(plot_type=plot_type,
-                                 options=self.data[name]['scdata'].pca.columns.values if plot_type == 'PCA' else
-                                 self.data[name]['scdata'].diffusion_eigenvectors.columns.values)
+                                 options=scobj.data.columns.values if plot_type == 'PCA' else scobj.data.columns.values)
 
-        if self.zVar.get() == 'None':
+        if self.zVar.get() == '':
             components = [self.xVar.get(), self.yVar.get()]
         else:
             components = [self.xVar.get(), self.yVar.get(), self.zVar.get()]
 
         colorSelection = self.colorVar.get().split(', ')
+
         if (len(colorSelection) == 1 and len(colorSelection[0]) > 0) or len(colorSelection) > 1:
             if len(colorSelection) == 1 and len(keys) == 1:
                 self.fig = plt.figure(figsize=[6 * len(colorSelection), 6 * len(keys)])
@@ -1070,34 +1080,34 @@ class magic_gui(tk.Tk):
 
             for i in range(len(keys)):
 
-                name = self.data_list.item(keys[i])['text'].split(' (')[0]
-                if plot_type in name:
-                    name = name.split(' ' + plot_type)[0]
+                if len(components) == 3:
+                    self.ax.append(self.fig.add_subplot(gs[i, 0], projection='3d'))
+                else:
+                    self.ax.append(self.fig.add_subplot(gs[i, 0]))
 
-                for j in range(len(colorSelection)):
+                scobj.scatter_gene_expression(components, fig=self.fig, ax=self.ax[len(self.ax) - 1],
+                                              color=colorSelection[0])
 
-                    if len(components) == 3:
-                        self.ax.append(self.fig.add_subplot(gs[i, j], projection='3d'))
-                    else:
-                        self.ax.append(self.fig.add_subplot(gs[i, j]))
+                """
+                if colorSelection[0] in self.data[name]['scdata'].extended_data.columns.get_level_values(1):
+                    self.data[name]['scdata'].scatter_gene_expression(components, fig=self.fig,
+                                                                      ax=self.ax[len(self.ax) - 1],
+                                                                      color=colorSelection[j])
+                elif colorSelection[j] == 'density':
+                    self.data[name]['scdata'].scatter_gene_expression(components, fig=self.fig,
+                                                                      ax=self.ax[len(self.ax) - 1], density=True)
+                else:
+                    self.data[name]['scdata'].scatter_gene_expression(components, fig=self.fig,
+                                                                      ax=self.ax[len(self.ax) - 1],
+                                                                      color=colorSelection[j])
+                """
 
-                    if colorSelection[j] in self.data[name]['scdata'].extended_data.columns.get_level_values(1):
-                        self.data[name]['scdata'].scatter_gene_expression(components, fig=self.fig,
-                                                                          ax=self.ax[len(self.ax) - 1],
-                                                                          color=colorSelection[j])
-                    elif colorSelection[j] == 'density':
-                        self.data[name]['scdata'].scatter_gene_expression(components, fig=self.fig,
-                                                                          ax=self.ax[len(self.ax) - 1], density=True)
-                    else:
-                        self.data[name]['scdata'].scatter_gene_expression(components, fig=self.fig,
-                                                                          ax=self.ax[len(self.ax) - 1],
-                                                                          color=colorSelection[j])
+                self.ax[len(self.ax) - 1].set_title(name)
+                self.ax[len(self.ax) - 1].set_xlabel(' '.join(components[0]))
+                self.ax[len(self.ax) - 1].set_ylabel(' '.join(components[1]))
 
-                    self.ax[len(self.ax) - 1].set_title(name + ' (color =' + colorSelection[j] + ')')
-                    self.ax[len(self.ax) - 1].set_xlabel(' '.join(components[0]))
-                    self.ax[len(self.ax) - 1].set_ylabel(' '.join(components[1]))
-                    if len(components) == 3:
-                        self.ax[len(self.ax) - 1].set_zlabel(' '.join(components[2]))
+                if len(components) == 3:
+                    self.ax[len(self.ax) - 1].set_zlabel(' '.join(components[2]))
 
             gs.tight_layout(self.fig)
 
@@ -1116,6 +1126,7 @@ class magic_gui(tk.Tk):
 
             self.currentPlot = plot_type
 
+    # updated
     def plotTSNE(self):
         keys = self.data_list.selection()
         self.getScatterSelection(plot_type='tsne')
@@ -1241,7 +1252,7 @@ class magic_gui(tk.Tk):
             self.curKey = key
             if 'TSNE' in data_name:
                 self.plotTSNE()
-            elif 'PCA' in data_name or 'Diffusion components' in data_name:
+            elif 'PCA' in data_name or 'DM' in data_name:
                 self.plotPCA_DM()
             else:
                 self.getScatterSelection()
@@ -1341,7 +1352,7 @@ class magic_gui(tk.Tk):
         # x
         if plot_type == 'tsne':
             tk.Label(self.scatterSelection, text=u"x: tSNE1", fg="black", bg="white").grid(row=5, column=0)
-        elif plot_type in ['PCA', 'Diffusion components']:
+        elif plot_type in ['PCA', 'DM']:
             tk.Label(self.scatterSelection, text=u"x:", fg="black", bg="white").grid(row=5, column=0)
             self.xVar = tk.StringVar()
             self.xVar.set(options[0])
@@ -1354,7 +1365,7 @@ class magic_gui(tk.Tk):
         # y
         if plot_type == 'tsne':
             tk.Label(self.scatterSelection, text=u"y: tSNE2", fg="black", bg="white").grid(row=6, column=0)
-        elif plot_type in ['PCA', 'Diffusion components']:
+        elif plot_type in ['PCA', 'DM']:
             tk.Label(self.scatterSelection, text=u"y:", fg="black", bg="white").grid(row=6, column=0)
             self.yVar = tk.StringVar()
             self.yVar.set(options[0])
@@ -1367,7 +1378,7 @@ class magic_gui(tk.Tk):
         # z
         if plot_type != 'tsne':
             self.zVar = tk.StringVar()
-            if plot_type in ['PCA', 'Diffusion components']:
+            if plot_type in ['PCA', 'DM']:
                 tk.Label(self.scatterSelection, text=u"z:", fg="black", bg="white").grid(row=7, column=0)
                 self.zVar.set('None')
                 tk.OptionMenu(self.scatterSelection, self.zVar, 'None', *options).grid(row=7, column=1)
