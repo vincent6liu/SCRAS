@@ -460,13 +460,13 @@ class SCData:
         pca_keys = [pca_key for pca_key in self.datadict.keys() if 'PCA' in pca_key.upper()]
         og_name = self.name if self.name.find(':') == -1 else self.name[:self.name.find(':')]
 
+        """
         comps, low_comp = [], self.data.shape[1]
         if bool(pca_keys):
-            print(pca_keys)
             comps = sorted([int(key[key.rfind(':') + 1:]) for key in pca_keys])
             low_comp = min(comps)
 
-        """
+
         # Work on PCA projections if data is single cell RNA-seq
         if self.data_type == 'sc-seq' and n_components > 0:
             if n_components in comps:
@@ -535,7 +535,7 @@ class SCData:
         return scdata, newpca
 
     def run_diffusion_map(self, k=10, epsilon=1, distance_metric='euclidean',
-                          n_diffusion_components=10, n_pca_components=15, ka=0, random_pca=True):
+                          n_diffusion_components=10, ka=0):
         """ Run diffusion maps on the data. Run on the principal component projections
         for single cell RNA-seq data and on the expression matrix for mass cytometry data
         :param k: Number of neighbors for graph construction to determine distances between cells
@@ -553,6 +553,7 @@ class SCData:
             comps = sorted([int(key[key.rfind(':') + 1:]) for key in pca_keys])
             low_comp = min(comps)
 
+        """
         # Work on PCA projections if data is single cell RNA-seq
         if self.data_type == 'sc-seq':
             if n_pca_components in comps:
@@ -564,12 +565,13 @@ class SCData:
                 pca_data = self.datadict[(self.name + ":PCA:" + str(low_comp))].iloc[:, :n_pca_components]
         else:
             pca_data = self
+        """
 
-        N = pca_data.data.shape[0]
+        N = self.data.shape[0]
 
         # Nearest neighbors
-        nbrs = NearestNeighbors(n_neighbors=k, metric=distance_metric).fit(pca_data.data)
-        distances, indices = nbrs.kneighbors(pca_data.data)
+        nbrs = NearestNeighbors(n_neighbors=k, metric=distance_metric).fit(self.data)
+        distances, indices = nbrs.kneighbors(self.data)
 
         if ka > 0:
             print('Autotuning distances')
@@ -633,12 +635,11 @@ class SCData:
         diffusion_eigenvectors = pd.DataFrame(V, index=self.data.index,
                                               columns=['DC' + str(i) for i in range(n_diffusion_components)])
         diffusion_eigenvalues = pd.DataFrame(D)
-        par = '-'.join((str(k), str(epsilon), str(distance_metric), str(n_diffusion_components), str(n_pca_components),
-                        str(ka), str(random_pca)))
-        key = pca_data.operation.history[0] + ":DM:" + par
-        scdata = SCData(key, diffusion_eigenvectors, pca_data.data_type, pca_data.metadata, pca_data.operation)
+        par = '-'.join((str(k), str(epsilon), str(distance_metric), str(n_diffusion_components), str(ka)))
+        key = self.operation.history[0] + ":DM:" + par
+        scdata = SCData(key, diffusion_eigenvectors, self.data_type, self.metadata, self.operation)
         scdata.operation.add('DM', par)
-        pca_data.datadict[key] = scdata
+        self.datadict[key] = scdata
         return scdata
 
     def plot_molecules_per_cell_and_gene(self, fig=None, ax=None):

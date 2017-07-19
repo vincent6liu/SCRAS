@@ -852,6 +852,7 @@ class magic_gui(tk.Tk):
         self.phenoResult.update()
         self.wait_window(self.phenoResult)
 
+    # updated
     def runTSNE(self):
         for key in self.data_list.selection():
             # pop up for # components
@@ -967,43 +968,76 @@ class magic_gui(tk.Tk):
             self.kVar.set(30)
             tk.Entry(self.DMOptions, textvariable=self.kVar).grid(column=1, row=3)
 
-            tk.Label(self.DMOptions, text=u"ka:", fg="black", bg="white").grid(column=0, row=4)
+            tk.Label(self.DMOptions, text=u"Distance metric:", fg="black", bg="white").grid(column=0, row=4)
+            self.disVar = tk.StringVar()
+            choices = {'euclidean', 'manhattan', 'correlation', 'cosine'}
+            self.disVar.set('euclidean')
+            tk.OptionMenu(self.DMOptions, self.disVar, *choices).grid(column=1, row=4)
+
+            tk.Label(self.DMOptions, text=u"ka:", fg="black", bg="white").grid(column=0, row=5)
             self.autotuneVar = tk.IntVar()
             self.autotuneVar.set(10)
-            tk.Entry(self.DMOptions, textvariable=self.autotuneVar).grid(column=1, row=4)
+            tk.Entry(self.DMOptions, textvariable=self.autotuneVar).grid(column=1, row=5)
 
-            tk.Label(self.DMOptions, text=u"Epsilon:", fg="black", bg="white").grid(column=0, row=5)
+            tk.Label(self.DMOptions, text=u"Epsilon:", fg="black", bg="white").grid(column=0, row=6)
             self.epsilonVar = tk.IntVar()
             self.epsilonVar.set(1)
-            tk.Entry(self.DMOptions, textvariable=self.epsilonVar).grid(column=1, row=5)
+            tk.Entry(self.DMOptions, textvariable=self.epsilonVar).grid(column=1, row=6)
 
             tk.Label(self.DMOptions, text=u"(Epsilon 0 is the uniform kernel)", fg="black", bg="white").grid(column=0,
                                                                                                              columnspan=2,
-                                                                                                             row=6)
+                                                                                                             row=7)
 
-            tk.Button(self.DMOptions, text="Run", command=self._runDM).grid(column=1, row=7)
-            tk.Button(self.DMOptions, text="Cancel", command=self.DMOptions.destroy).grid(column=0, row=7)
+            tk.Button(self.DMOptions, text="Run", command=self._runDM).grid(column=1, row=8)
+            tk.Button(self.DMOptions, text="Cancel", command=self.DMOptions.destroy).grid(column=0, row=8)
             self.wait_window(self.DMOptions)
 
     def _runDM(self):
-        for key in self.data_list.selection():
-            name = self.data_list.item(key)['text'].split(' (')[0]
-            if self.data[name]['scdata'].diffusion_eigenvectors is None:
-                self.data[name]['scdata'].run_diffusion_map(n_diffusion_components=self.nCompVar.get(),
-                                                            epsilon=self.epsilonVar.get(),
-                                                            n_pca_components=self.nPCAVar.get(),
-                                                            k=self.kVar.get(), ka=self.autotuneVar.get(),
-                                                            random_pca=self.randomPCAVar.get())
+        # get the name of the currently selected dataset
+        name = self.data_list.item(self.curKey, 'text').split(' (')[0]
 
-            self.data_list.insert(key, 'end', text=name + ' Diffusion components' +
-                                                   ' (' + str(
-                self.data[name]['scdata'].diffusion_eigenvectors.shape[0]) +
-                                                   ' x ' + str(
-                self.data[name]['scdata'].diffusion_eigenvectors.shape[1]) + ')', open=True)
-            self.DMOptions.destroy()
-            print(str(self.data[name]['scdata'].diffusion_eigenvectors.shape))
-            print(str(self.data[name]['scdata'].diffusion_eigenvalues.shape))
-            print(str(self.data[name]['scdata'].diffusion_map_correlations.shape))
+        # find the operation sequence of the current dataset and use it to find the corresponding SCData object
+        opseq = self._datafinder(self.data_list, self.curKey)
+        og = self.data[opseq[0]]['scdata']
+        scobj = mg.SCData.retrieve_data(og, opseq)
+
+        # keys of the current operation
+        og = name if name.find(':') == -1 else name[:name.find(':')]
+        new_key = self._keygen(og, 'DM', [str(self.kVar.get()), str(self.epsilonVar.get()), str(self.disVar.get()),
+                                          str(self.nCompVar.get()), str(self.autotuneVar.get())])
+        pca_key = self._keygen(og, 'PCA', [str(self.nPCAVar.get())])
+
+        # run pca if the current operation hasn't been run; access the data otherwise
+        if self.nPCAVar.get() == 0:
+            pcadata = scobj
+        elif pca_key not in scobj.datadict:
+            pcadata = scobj.run_pca(n_components=self.nPCAVar.get())
+
+            # insert the new key to the current tree view under the parent dataset
+            self.curKey = self.data_list.insert(self.curKey, 'end', text=pca_key + ' (' + str(pcadata.data.shape[0]) +
+                                                                         ' x ' + str(pcadata.data.shape[1]) + ')',
+                                                open=True)
+        else:
+            pcadata = scobj.datadict[pca_key]
+            children = self.data_list.get_children(self.curKey)
+            for child in children:
+                item_name = self.data_list.item(child, 'text').split(' (')[0]
+                if pca_key in item_name:
+                    self.curKey = child
+
+        # run tsne if the current operation hasn't been run; access the data otherwise
+        if new_key not in pcadata.datadict:
+            tsnedata = pcadata.run_diffusion_map(self.kVar.get(), self.epsilonVar.get(), self.disVar.get(),
+                                                 self.nCompVar.get(), self.autotuneVar.get())
+        else:
+            tsnedata = pcadata.datadict[new_key]
+
+        # insert the new key to the current tree view under the parent dataset
+        self.curKey = self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(tsnedata.data.shape[0]) +
+                                            ' x ' + str(tsnedata.data.shape[1]) + ')', open=True)
+
+        self.analysisMenu.entryconfig(2, state='normal')
+        self.DMOptions.destroy()
 
     def plotPCA_DM(self):
         keys = self.data_list.selection()
