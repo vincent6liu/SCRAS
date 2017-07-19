@@ -463,40 +463,24 @@ class magic_gui(tk.Tk):
 
         self.concatOptions.destroy()
 
-    # need to be modified later
+    # updated
     def _deleteDataItem(self, event):
         self.data_detail.delete(*self.data_detail.get_children())
-        for key in self.data_list.selection():
-            """
-            name = self.data_list.item(key)['text'].split(' (')[0]
-            if name in self.data:
-                del self.data[name]
-            else:
-                data_set_name = self.data_list.item(self.data_list.parent(key))['text'].split(' (')[0]
-                if 'Principal components' in name:
-                    self.data[data_set_name]['scdata'].pca = None
-                elif 'tSNE' in name:
-                    self.data[data_set_name]['scdata'].tsne = None
-                elif 'Diffusion components' in name:
-                    self.data[data_set_name]['scdata'].diffusion_eigenvectors = None
-                    self.data[data_set_name]['scdata'].diffusion_eigenvalues = None
-                elif 'Wishbone' in name:
-                    del self.data[data_set_name]['wb']
-                elif 'MAGIC' in name:
-                    del self.data[data_set_name + ' MAGIC']
-                    self.data[data_set_name]['scdata'].magic = None
-            """
+        self.data_history.delete(*self.data_history.get_children())
 
+        for key in self.data_list.selection():
+            self.curKey = key
+            name = self.data_list.item(self.curKey, 'text').split(' (')[0]
+            og_name = name if name.find(':') == -1 else name[:name.find(':')]
             # find the operation sequence of the parent dataset and use it to find the corresponding SCData object
             parentID = self.data_list.parent(self.curKey)
             if parentID:
                 opseq = self._datafinder(self.data_list, parentID)
-                og = self.data[opseq[0]]['scdata']
+                og = self.data[og_name]['scdata']
                 scobj = mg.SCData.retrieve_data(og, opseq)
-                scobj.datadict.pop(opseq[-1])
+                scobj.datadict.pop(name)
             else:
-                name = self.data_list.item(self.curKey, 'text').split(' (')[0]
-                del self.data[name]['scdata']
+                del self.data[og_name]['scdata']
 
             self.data_list.delete(key)
 
@@ -693,7 +677,7 @@ class magic_gui(tk.Tk):
 
         self.magicOptions.destroy()
         self.magicProgress = tk.Toplevel()
-        self.magicProgress.title(curKey + ': Running MAGIC')
+        self.magicProgress.title(name + ': Running MAGIC')
         tk.Label(self.magicProgress, text="Running MAGIC - refer to console for progress updates.").grid(column=0,
                                                                                                          row=0)
         self.magicProgress.update()
