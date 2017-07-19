@@ -465,7 +465,6 @@ class magic_gui(tk.Tk):
 
     # need to be modified later
     def _deleteDataItem(self, event):
-
         self.data_detail.delete(*self.data_detail.get_children())
         for key in self.data_list.selection():
             """
@@ -487,6 +486,18 @@ class magic_gui(tk.Tk):
                     del self.data[data_set_name + ' MAGIC']
                     self.data[data_set_name]['scdata'].magic = None
             """
+
+            # find the operation sequence of the parent dataset and use it to find the corresponding SCData object
+            parentID = self.data_list.parent(self.curKey)
+            if parentID:
+                opseq = self._datafinder(self.data_list, parentID)
+                og = self.data[opseq[0]]['scdata']
+                scobj = mg.SCData.retrieve_data(og, opseq)
+                scobj.datadict.pop(opseq[-1])
+            else:
+                name = self.data_list.item(self.curKey, 'text').split(' (')[0]
+                del self.data[name]['scdata']
+
             self.data_list.delete(key)
 
     # updated, may need to be modified later
@@ -796,8 +807,13 @@ class magic_gui(tk.Tk):
             self.wait_window(self.phenoOptions)
 
     def _runPhenoGraph(self):
-        name = self.data_list.item(self.curKey)['text'].split(' (')[0]
-        scdata = self.data[name]['scdata']
+        # get the name of the currently selected dataset
+        name = self.data_list.item(self.curKey, 'text').split(' (')[0]
+
+        # find the operation sequence of the current dataset and use it to find the corresponding SCData object
+        opseq = self._datafinder(self.data_list, self.curKey)
+        og = self.data[opseq[0]]['scdata']
+        scobj = mg.SCData.retrieve_data(og, opseq)
 
         self.phenoOptions.destroy()
         self.phenoProgress = tk.Toplevel()
@@ -1038,9 +1054,10 @@ class magic_gui(tk.Tk):
         self.curKey = self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(tsnedata.data.shape[0]) +
                                             ' x ' + str(tsnedata.data.shape[1]) + ')', open=True)
 
-        self.analysisMenu.entryconfig(2, state='normal')
+        self.plotPCA_DM()
         self.DMOptions.destroy()
 
+    # updated
     def plotPCA_DM(self):
         keys = self.data_list.selection()
         name = self.data_list.item(keys[0])['text'].split(' (')[0]

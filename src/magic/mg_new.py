@@ -408,7 +408,13 @@ class SCData:
                 to_keep = np.where(sums >= filter_gene_mols)[0]
                 self.data = self.data.loc[:, to_keep].astype(np.float32)
 
-    def log_transform_scseq_data(self, pseudocount=0.1):
+    def log_transform_scseq_data(self):
+        if 'LOGTRANS' in self.operation.history:
+            pass
+        else:
+            self.data = np.log(np.add(self.data, 0.1))
+            self.operation.add('LOGTRANS')
+        """
         # check whether the current data has already been log-transformed
         for op in self.operation.history:
             if 'LOGTRANS' in op:
@@ -427,6 +433,7 @@ class SCData:
         self.datadict[key] = scdata
 
         return scdata
+        """
 
     def run_pca(self, n_components=100, rand=True):
         """
