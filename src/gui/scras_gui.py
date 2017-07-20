@@ -149,14 +149,60 @@ class SCRASGui(tk.Tk):
             # log transform
             logTransform = tk.BooleanVar()
             logTransform.set(True)
-            tk.Checkbutton(import_options, text="Log-transform data", variable=logTransform).grid(column=2, row=11)
+            tk.Checkbutton(import_options, text="Log-transform data", variable=logTransform).grid(column=1, row=11)
 
-            tk.Button(import_options, text="Cancel", command=import_options.destroy).grid(column=1, row=12)
+            # MAGIC
+            magicVar = tk.BooleanVar()
+            magicVar.set(True)
+            tk.Checkbutton(import_options, text="Run MAGIC on the data", variable=magicVar).grid(column=2, row=11)
+
+            # pop up for magic option
+            tk.Label(import_options, text="MAGIC options", pady=5).grid(column=1, row=12)
+
+            tk.Label(import_options, text="# of PCA components:", fg="black", bg="white").grid(column=0, row=13)
+            self.nCompVar = tk.IntVar()
+            self.nCompVar.set(20)
+            tk.Entry(import_options, textvariable=self.nCompVar).grid(column=1, row=13)
+
+            self.randomVar = tk.BooleanVar()
+            self.randomVar.set(True)
+            tk.Checkbutton(import_options, text="Randomized PCA", variable=self.randomVar).grid(column=0, row=14,
+                                                                                                columnspan=2)
+
+            tk.Label(import_options, text="t:", fg="black", bg="white").grid(column=0, row=15)
+            self.tVar = tk.IntVar()
+            self.tVar.set(6)
+            tk.Entry(import_options, textvariable=self.tVar).grid(column=1, row=15)
+
+            tk.Label(import_options, text="k:", fg="black", bg="white").grid(column=0, row=16)
+            self.kVar = tk.IntVar()
+            self.kVar.set(30)
+            tk.Entry(import_options, textvariable=self.kVar).grid(column=1, row=16)
+
+            tk.Label(import_options, text="ka:", fg="black", bg="white").grid(column=0, row=17)
+            self.autotuneVar = tk.IntVar()
+            self.autotuneVar.set(10)
+            tk.Entry(import_options, textvariable=self.autotuneVar).grid(column=1, row=17)
+
+            tk.Label(import_options, text="Epsilon:", fg="black", bg="white").grid(column=0, row=18)
+            self.epsilonVar = tk.IntVar()
+            self.epsilonVar.set(1)
+            tk.Entry(import_options, textvariable=self.epsilonVar).grid(column=1, row=18)
+
+            tk.Label(import_options, text="(Epsilon 0 is the uniform kernel)", fg="black", bg="white").grid(
+                column=0, columnspan=2, row=19)
+
+            self.rescaleVar = tk.IntVar()
+            self.rescaleVar.set(99)
+            tk.Label(import_options, text="Rescale data to ", fg="black", bg="white").grid(column=0, row=20)
+            tk.Entry(import_options, textvariable=self.rescaleVar).grid(column=1, row=20)
+            tk.Label(import_options, text=" percentile", fg="black", bg="white").grid(column=2, row=20)
+            tk.Label(import_options, text="0 is no rescale (use for log-transformed data).").grid(row=20, column=3,
+                                                                                                  columnspan=2)
+
+            tk.Button(import_options, text="Cancel", command=import_options.destroy).grid(column=1, row=21)
             tk.Button(import_options, text="Load", command=partial(self.process_data, file_type='csv')).grid(column=2,
-                                                                                                             row=12)
-
-            # put MAGIC options here
-
+                                                                                                             row=21)
             self.wait_window(import_options)
 
     def load_mtx(self):
