@@ -87,7 +87,7 @@ def density_2d(x, y):
 
 
 class ClusterInfo:
-    def __init__(self, communities, graph, Q, source, method='phenograph'):
+    def __init__(self, communities, graph, Q, method='phenograph'):
         if not isinstance(communities, np.ndarray):
             raise TypeError("communities must be a numpy array")
         elif not isinstance(graph, coo.coo_matrix):
@@ -97,6 +97,7 @@ class ClusterInfo:
         self._cluster = communities
         self._graph = graph
         self._modscore = Q
+        self._method = method
 
     @property
     def cluster(self):
@@ -110,13 +111,17 @@ class ClusterInfo:
     def modscore(self):
         return self._modscore
 
+    @property
+    def method(self):
+        return self._method
+
 
 class Operations:
     def __init__(self, sourcename: str = None, inherite: list = None):
         if not sourcename and not inherite:
             raise RuntimeError("sourcename and inherite can't both be None")
         self._history = deepcopy(inherite) if inherite else [sourcename]
-        self._operations = ("PCA", "TSNE", "DM", "MAGIC", "PHENOGRAPH", "LOGTRANS", "NORMALIZED")
+        self._operations = ("PCA", "DM", "MAGIC", "PHENOGRAPH", "LOGTRANS", "NORMALIZED", "FILTERED")
 
     @property
     def history(self):
@@ -125,7 +130,7 @@ class Operations:
     def add(self, op: str, params: str = ''):
         if op not in self._operations:
             raise RuntimeError("Invalid operation.")
-        cur_op = op + ':' + params if op != 'NORMALIZED' else op
+        cur_op = op + ':' + params if op not in ['NORMALIZED', 'LOGTRANS', "FILTERED"] else op
         self._history.append(cur_op)
 
     def clear(self):
@@ -151,11 +156,14 @@ class SCData:
         self._operation = Operations(sourcename=self.name) if operation is None \
             else Operations(inherite=operation.history)
 
-        # Library size (whats this??)
+        self._clusterinfo = None
+
+        # Library size
         self._library_sizes = None
 
-    # may need to be rewritten
     def reset(self):
+        self._datadict.clear()
+        self.operation.clear()
         self._library_sizes = None
 
     def save(self, out_file: str):
@@ -200,7 +208,7 @@ class SCData:
     def datadict(self):
         return self._datadict
 
-    # returns the raw or normalized data
+    # returns the raw data
     @property
     def data(self):
         return self._datadict['original '+self.name]
@@ -209,9 +217,9 @@ class SCData:
     def data(self, item):
         if not (isinstance(item, pd.DataFrame)):
             raise TypeError('SCData.data must be of type DataFrame')
+        self.reset()
         cols = [np.array(item.columns.values)]
         self._datadict = {'original '+self.name: pd.DataFrame(item.values, index=item.index, columns=cols)}
-        self.reset()
 
     @property
     def metadata(self):
@@ -222,6 +230,16 @@ class SCData:
         if not isinstance(item, pd.DataFrame):
             raise TypeError('SCData.metadata must be of type DataFrame')
         self._metadata = item
+
+    @property
+    def cluster(self):
+        return self._clusterinfo
+
+    @cluster.setter
+    def cluster(self, cluobj):
+        if type(cluobj) is not type(ClusterInfo):
+            raise TypeError("cluster must be a ClusterInfo object")
+        self._clusterinfo = cluobj
 
     @property
     def library_sizes(self):
@@ -410,98 +428,10 @@ class SCData:
 
     def log_transform_scseq_data(self):
         if 'LOGTRANS' in self.operation.history:
-            pass
+            return
         else:
             self.data = np.log(np.add(self.data, 0.1))
             self.operation.add('LOGTRANS')
-        """
-        # check whether the current data has already been log-transformed
-        for op in self.operation.history:
-            if 'LOGTRANS' in op:
-                warnings.warn("Performing log-transformation on already log-transformed data")
-
-        key = self._name + ":LOGTRANS:" + str(pseudocount)
-        new_data = np.log(np.add(self.data, pseudocount))
-        scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
-        scdata.operation.add('LOGTRANS', str(pseudocount))
-
-        # keep only one copy of the log-transformed data
-        for k in self.datadict.keys():
-            if 'LOGTRANS' in k.upper():
-                self._datadict.pop(k)
-
-        self.datadict[key] = scdata
-
-        return scdata
-        """
-
-    def run_pca(self, n_components=100, rand=True):
-        """
-        Principal component analysis of the data.
-        Note: Column values for the old method are (dataname, PCX) now its just PCX
-        :param n_components: Number of components to project the data
-        :param rand: Whether randomized
-        """
-        solver = 'randomized' if rand else 'full'
-
-        pca = PCA(n_components=n_components, svd_solver=solver)
-        new_data = pd.DataFrame(data=pca.fit_transform(self.data.values), index=self.data.index,
-                                columns=['PC' + str(i) for i in range(1, n_components + 1)])
-
-        key = self.operation.history[0] + ":PCA:" + str(n_components)
-        scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
-        scdata.operation.add('PCA', str(n_components))
-        self.datadict[key] = scdata
-
-        return scdata
-
-    def run_tsne(self, perplexity=30, n_iter=1000, theta=0.5):
-        """ Run tSNE on the data. tSNE is run on the principal component projections
-        for single cell RNA-seq data and on the expression matrix for mass cytometry data
-        stored in the data dictionary as "name:TSNE:comp-perp-iter-theta"
-        Note: Column values for the old method are (dataname, tSNE) now its just tSNE
-        :param n_components: Number of components to use for running tSNE for single cell
-        RNA-seq data. Ignored for mass cytometry
-        :return: None
-        """
-        pca_keys = [pca_key for pca_key in self.datadict.keys() if 'PCA' in pca_key.upper()]
-        og_name = self.name if self.name.find(':') == -1 else self.name[:self.name.find(':')]
-
-        """
-        comps, low_comp = [], self.data.shape[1]
-        if bool(pca_keys):
-            comps = sorted([int(key[key.rfind(':') + 1:]) for key in pca_keys])
-            low_comp = min(comps)
-
-
-        # Work on PCA projections if data is single cell RNA-seq
-        if self.data_type == 'sc-seq' and n_components > 0:
-            if n_components in comps:
-                pca_data = self.datadict[(og_name + ":PCA:" + str(n_components))]
-            elif (not bool(pca_keys)) or n_components > low_comp:
-                self.run_pca(n_components=n_components)
-                pca_data = self.datadict[(og_name + ":PCA:" + str(n_components))]
-            else:  # n_components <= low_comp
-                pca_data = self.datadict[(og_name + ":PCA:" + str(low_comp))].iloc[:, :n_components]
-        else:
-            pca_data = self
-        """
-
-        # Reduce perplexity if necessary
-        perplexity_limit = 15
-        if self.data.shape[0] < 100 and perplexity > perplexity_limit:
-            print('Reducing perplexity to %d since there are <100 cells in the dataset. ' % perplexity_limit)
-        tsne = TSNE(n_components=2, perplexity=perplexity, init='random', random_state=sum(self.data.shape),
-                    n_iter=n_iter, angle=float(theta))
-
-        new_data = pd.DataFrame(tsne.fit_transform(self.data), index=self.data.index, columns=['tSNE1', 'tSNE2'])
-        par = "-".join((str(perplexity), str(n_iter), str(theta)))
-        key = og_name + ":TSNE:" + par
-        scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
-        scdata.operation.add('TSNE', par)
-        self.datadict[key] = scdata
-
-        return scdata
 
     def run_magic(self, n_pca_components=20, random_pca=True, t=6, k=30, ka=10, epsilon=1, rescale_percent=99):
 
@@ -541,6 +471,26 @@ class SCData:
 
         return scdata, newpca
 
+    def run_pca(self, n_components=100, rand=True):
+        """
+        Principal component analysis of the data.
+        Note: Column values for the old method are (dataname, PCX) now its just PCX
+        :param n_components: Number of components to project the data
+        :param rand: Whether randomized
+        """
+        solver = 'randomized' if rand else 'full'
+
+        pca = PCA(n_components=n_components, svd_solver=solver)
+        new_data = pd.DataFrame(data=pca.fit_transform(self.data.values), index=self.data.index,
+                                columns=['PC' + str(i) for i in range(1, n_components + 1)])
+
+        ogname = self.operation.history[0] + ":PCA:" + str(n_components)
+        scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
+        scdata.operation.add('PCA', str(n_components))
+        self.datadict[ogname] = scdata
+
+        return scdata
+
     def run_diffusion_map(self, k=10, epsilon=1, distance_metric='euclidean',
                           n_diffusion_components=10, ka=0):
         """ Run diffusion maps on the data. Run on the principal component projections
@@ -548,31 +498,11 @@ class SCData:
         :param k: Number of neighbors for graph construction to determine distances between cells
         :param epsilon: Gaussian standard deviation for converting distances to affinities
         :param n_diffusion_components: Number of diffusion components to Generalte
-        :param n_pca_components: Number of components to use for running tSNE for single cell
-        RNA-seq data. Ignored for mass cytometry
         :return: None
         """
-
-        pca_keys = [pca_key for pca_key in self.datadict.keys() if 'PCA' in pca_key.upper()]
-        comps = []
-        low_comp = 0
-        if bool(pca_keys):
-            comps = sorted([int(key[key.rfind(':') + 1:]) for key in pca_keys])
-            low_comp = min(comps)
-
-        """
-        # Work on PCA projections if data is single cell RNA-seq
-        if self.data_type == 'sc-seq':
-            if n_pca_components in comps:
-                pca_data = self.datadict[(self.name + ":PCA:" + str(n_pca_components))]
-            elif (not bool(pca_keys)) or n_pca_components > low_comp:
-                self.run_pca(n_components=n_pca_components)
-                pca_data = self.datadict[(self.name + ":PCA:" + str(n_pca_components))]
-            else:  # n_components <= low_comp
-                pca_data = self.datadict[(self.name + ":PCA:" + str(low_comp))].iloc[:, :n_pca_components]
-        else:
-            pca_data = self
-        """
+        if self.data_type == 'sc-seq' and 'PCA' not in self.operation.history[-1]:
+            print("must provide pcadata for scRNA sequencing data")
+            return
 
         N = self.data.shape[0]
 
@@ -647,7 +577,31 @@ class SCData:
         scdata = SCData(key, diffusion_eigenvectors, self.data_type, self.metadata, self.operation)
         scdata.operation.add('DM', par)
         self.datadict[key] = scdata
+
         return scdata
+
+    # note now this only returns a pd.Dataframe object
+    def run_tsne(self, perplexity=30, n_iter=1000, theta=0.5):
+        """ Run tSNE on the data. tSNE is run on the principal component projections
+        for single cell RNA-seq data and on the expression matrix for mass cytometry data
+        stored in the data dictionary as "name:TSNE:comp-perp-iter-theta"
+        Note: Column values for the old method are (dataname, tSNE) now its just tSNE
+        :param n_components: Number of components to use for running tSNE for single cell
+        RNA-seq data. Ignored for mass cytometry
+        :return: None
+        """
+        og_name = self.name if self.name.find(':') == -1 else self.name[:self.name.find(':')]
+
+        # Reduce perplexity if necessary
+        perplexity_limit = 15
+        if self.data.shape[0] < 100 and perplexity > perplexity_limit:
+            print('Reducing perplexity to %d since there are <100 cells in the dataset. ' % perplexity_limit)
+        tsne = TSNE(n_components=2, perplexity=perplexity, init='random', random_state=sum(self.data.shape),
+                    n_iter=n_iter, angle=float(theta))
+
+        tsne_data = pd.DataFrame(tsne.fit_transform(self.data), index=self.data.index, columns=['tSNE1', 'tSNE2'])
+
+        return tsne_data
 
     def plot_molecules_per_cell_and_gene(self, fig=None, ax=None):
         if len(self.operation.history) != 1:
@@ -706,24 +660,17 @@ class SCData:
 
         return fig, ax
 
-    def plot_tsne(self, fig=None, ax=None, density=False, color=None, title='tSNE projection'):
+    @staticmethod
+    def plot_tsne(tsne, fig=None, ax=None, density=False, color=None, title='tSNE projection'):
         """Plot tSNE projections of the data
         Must make sure the object being operated contains tSNE data
-        :param param: 4 parameters of tSNE separated by '-'
+        :param tsne: pd.Dataframe that contains tsne data
         :param fig: matplotlib Figure object
         :param ax: matplotlib Axis object
         :param title: Title for the plot
         """
         fontP = FontProperties()
         fontP.set_size('xx-small')
-
-        if 'TSNE' not in self.operation.history[-1]:
-            print('must be run on a tSNE data set')
-            print(self.operation.history)
-            print(self.name)
-            return
-
-        tsne = self.data
 
         fig, ax = get_fig(fig=fig, ax=ax)
         if isinstance(color, pd.Series):
@@ -751,35 +698,6 @@ class SCData:
         ax.set_title(title)
         plt.axis('tight')
         plt.tight_layout()
-        return fig, ax
-
-    def plot_tsne_by_cell_sizes(self, fig=None, ax=None, vmin=None, vmax=None):
-        """Plot tSNE projections of the data with cells colored by molecule counts
-        :param fig: matplotlib Figure object
-        :param ax: matplotlib Axis object
-        :param vmin: Minimum molecule count for plotting
-        :param vmax: Maximum molecule count for plotting
-        :param title: Title for the plot
-        """
-        if self.data_type == 'masscyt':
-            raise RuntimeError('plot_tsne_by_cell_sizes is not applicable \n\
-                for mass cytometry data. ')
-
-        if self.operation.history[-1] != 'TSNE':
-            print('must be run on a tSNE data set')
-            return
-
-        fig, ax = get_fig(fig, ax)
-
-        if 'NORMALIZED' in self.operation.history:
-            sizes = self.library_sizes
-        else:
-            sizes = self.data.sum(axis=1)
-        plt.scatter(self.tsne['tSNE1'], self.tsne['tSNE2'], s=size, c=sizes, edgecolors='none')
-        plt.colorbar()
-        plt.axis('tight')
-        plt.tight_layout()
-
         return fig, ax
 
     def scatter_gene_expression(self, genes, density=False, color=None, fig=None, ax=None):
