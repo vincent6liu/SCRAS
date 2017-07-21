@@ -186,12 +186,14 @@ class SCRASGui(tk.Tk):
             self.logTransform = tk.BooleanVar()
             self.logTransform.set(True)
             tk.Checkbutton(checkButtonContainer,
-                           text="Log-transform data", variable=self.logTransform).grid(column=1, row=0, sticky='w')
+                           text="Log-transform data", variable=self.logTransform,
+                           command=self._update_mg_options).grid(column=1, row=0, sticky='w')
             # MAGIC
             self.magicVar = tk.BooleanVar()
-            self.magicVar.set(True)
+            self.magicVar.set(False)
             tk.Checkbutton(checkButtonContainer,
-                           text="Run MAGIC on the data", variable=self.magicVar).grid(column=3, row=0, sticky='w')
+                           text="Run MAGIC on the data", variable=self.magicVar,
+                           command=self._update_mg_options).grid(column=3, row=0, sticky='w')
 
             # MAGIC options
             tk.Label(self.import_options, text="MAGIC options").grid(column=0, row=14, pady=8, sticky='w')
@@ -201,51 +203,56 @@ class SCRASGui(tk.Tk):
             tk.Label(mgPCACompContainer, text="Number of PCA components:", fg="black", bg="white").grid(column=0, row=0)
             self.mgCompVar = tk.IntVar()
             self.mgCompVar.set(20)
-            tk.Entry(mgPCACompContainer, textvariable=self.mgCompVar, state='disabled').grid(column=1, row=0)
+            self.mgPCAEntry = tk.Entry(mgPCACompContainer, textvariable=self.mgCompVar, state='disabled')
+            self.mgPCAEntry.grid(column=1, row=0)
             self.mgRandomVar = tk.BooleanVar()
             self.mgRandomVar.set(True)
-            tk.Checkbutton(mgPCACompContainer,
-                           text="Randomized PCA", variable=self.mgRandomVar,
-                           state='disabled').grid(column=1, row=1, sticky='W')
+            self.mgRandCheckButton = tk.Checkbutton(mgPCACompContainer, text="Randomized PCA",
+                                                    variable=self.mgRandomVar, state='disabled')
+            self.mgRandCheckButton.grid(column=1, row=1, sticky='W')
 
             mgTContainer = tk.Frame(self.import_options)
             mgTContainer.grid(column=0, row=16, sticky='W')
             tk.Label(mgTContainer, text="t:", fg="black", bg="white").grid(column=0, row=0, sticky='W')
             self.mgTVar = tk.IntVar()
             self.mgTVar.set(6)
-            tk.Entry(mgTContainer, textvariable=self.mgTVar, state='disabled').grid(column=1, row=0, sticky='W')
+            self.mgTVarEntry = tk.Entry(mgTContainer, textvariable=self.mgTVar, state='disabled')
+            self.mgTVarEntry.grid(column=1, row=0, sticky='W')
 
             mgKContainer = tk.Frame(self.import_options)
             mgKContainer.grid(column=0, row=17, sticky='w')
             tk.Label(mgKContainer, text="k:", fg="black", bg="white").grid(column=0, row=0, sticky='W')
             self.mgKVar = tk.IntVar()
             self.mgKVar.set(30)
-            tk.Entry(mgKContainer, textvariable=self.mgKVar, state='disabled').grid(column=1, row=0, sticky='W')
+            self.mgKVarEntry = tk.Entry(mgKContainer, textvariable=self.mgKVar, state='disabled')
+            self.mgKVarEntry.grid(column=1, row=0, sticky='W')
 
             mgKaContainer = tk.Frame(self.import_options)
             mgKaContainer.grid(column=0, row=18, sticky='w')
             tk.Label(mgKaContainer, text="ka:", fg="black", bg="white").grid(column=0, row=0, sticky='W')
             self.mgKaVar = tk.IntVar()
             self.mgKaVar.set(10)
-            tk.Entry(mgKaContainer, textvariable=self.mgKaVar, state='disabled').grid(column=1, row=0, sticky='W')
+            self.mgKaVarEntry = tk.Entry(mgKaContainer, textvariable=self.mgKaVar, state='disabled')
+            self.mgKaVarEntry.grid(column=1, row=0, sticky='W')
 
             mgEpContainer = tk.Frame(self.import_options)
             mgEpContainer.grid(column=0, row=19, sticky='w')
             tk.Label(mgEpContainer, text="Epsilon:", fg="black", bg="white").grid(column=0, row=0, sticky='W')
             self.mgEpVar = tk.IntVar()
             self.mgEpVar.set(1)
-            tk.Entry(mgEpContainer, textvariable=self.mgEpVar, state='disabled').grid(column=1, row=0, sticky='W')
+            self.mgEPVar = tk.Entry(mgEpContainer, textvariable=self.mgEpVar, state='disabled')
+            self.mgEPVar.grid(column=1, row=0, sticky='W')
             tk.Label(mgEpContainer, text="(0 is the uniform kernel)",
                      fg="black", bg="white").grid(column=2, row=0)
 
             mgRescaleContainer = tk.Frame(self.import_options)
             mgRescaleContainer.grid(column=0, row=20, sticky='w')
-            self.mgrRscaleVar = tk.IntVar()
-            self.mgrRscaleVar.set(99)
+            self.mgRescaleVar = tk.IntVar()
+            self.mgRescaleVar.set(99)
             tk.Label(mgRescaleContainer, text="Rescale data to ",
                      fg="black", bg="white").grid(column=0, row=0, sticky='w')
-            tk.Entry(mgRescaleContainer, textvariable=self.mgrRscaleVar,
-                     state='disabled').grid(column=1, row=0, sticky='w')
+            self.mgResEntry = tk.Entry(mgRescaleContainer, textvariable=self.mgRescaleVar, state='disabled')
+            self.mgResEntry.grid(column=1, row=0, sticky='w')
             tk.Label(mgRescaleContainer, text=" percentile (use 0 for log-transformed data)",
                      fg="black", bg="white").grid(column=2, row=0, sticky='w')
 
@@ -256,6 +263,30 @@ class SCRASGui(tk.Tk):
                       command=partial(self.process_data, file_type='csv')).grid(column=1, row=0, padx=20)
 
             self.wait_window(self.import_options)
+
+    def _update_mg_options(self):
+        if self.magicVar.get():
+            self.mgPCAEntry.config(state='normal')
+            self.mgRandCheckButton.config(state='normal')
+            self.mgTVarEntry.config(state='normal')
+            self.mgKVarEntry.config(state='normal')
+            self.mgKaVarEntry.config(state='normal')
+            self.mgEPVar.config(state='normal')
+            if self.logTransform.get():
+                self.mgRescaleVar.set(0)
+                self.mgResEntry.config(state='disabled')
+            else:
+                self.mgRescaleVar.set(99)
+                self.mgResEntry.config(state='normal')
+        else:
+            self.mgPCAEntry.config(state='disabled')
+            self.mgRandCheckButton.config(state='disabled')
+            self.mgTVarEntry.config(state='disabled')
+            self.mgKVarEntry.config(state='disabled')
+            self.mgKaVarEntry.config(state='disabled')
+            self.mgEPVar.config(state='disabled')
+            self.mgResEntry.config(state='disabled')
+
 
     def load_mtx(self):
         pass  # to be implemented
@@ -339,7 +370,7 @@ class SCRASGui(tk.Tk):
 
             if self.magicVar.get() is True:
                 scdata.run_magic(self.mgCompVar.get(), self.mgRandomVar.get(), self.mgTVar.get(), self.mgKVar.get(),
-                                 self.mgKaVar.get(), self.mgEpVar.get(), self.mgrRscaleVar.get())
+                                 self.mgKaVar.get(), self.mgEpVar.get(), self.mgRescaleVar.get())
 
         else:  # pickled Wishbone object
             pass  # to be implemented
