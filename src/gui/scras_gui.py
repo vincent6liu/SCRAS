@@ -31,7 +31,6 @@ class SCRASGui(tk.Tk):
         self.analysisMenu = tk.Menu(self.menubar, tearoff=0)
         self.visMenu = tk.Menu(self.menubar, tearoff=0)
 
-        self.vals = None
         self.currentPlot = None
         self.data = {}
 
@@ -74,7 +73,7 @@ class SCRASGui(tk.Tk):
         # update
         self.protocol('WM_DELETE_WINDOW', self.quit_scras())
         self.grid_columnconfigure(0, weight=1)
-        self.resizable(True, True)
+        self.resizable(False, False)
         self.update()
         self.geometry(self.geometry())
         self.focus_force()
@@ -84,125 +83,176 @@ class SCRASGui(tk.Tk):
 
         if filename:
             import_options = tk.Toplevel()
-            import_options.title('Data options')
-            tk.Label(import_options, text="File name: ", pady=5).grid(column=0, row=0)
-            tk.Label(import_options, text=filename.split('/')[-1], pady=5).grid(column=1, row=0)
+            import_options.resizable(False, False)
+            import_options.title('Import options')
 
-            tk.Label(import_options, text="Data name: ").grid(column=0, row=1)
+            fileNameContainer = tk.Frame(import_options)
+            fileNameContainer.grid(column=0, row=0, sticky='w')
+            tk.Label(fileNameContainer, text="File name: ", pady=5).grid(column=0, row=0, sticky='w')
+            tk.Label(fileNameContainer, text=filename.split('/')[-1]).grid(column=1, row=0, sticky='w')
+
+            nameEntryContainer = tk.Frame(import_options)
+            nameEntryContainer.grid(column=0, row=1, sticky='w')
+            tk.Label(nameEntryContainer, text="Data name: ").grid(column=0, row=0, sticky='w')
             fileNameEntryVar = tk.StringVar()
             fileNameEntryVar.set('Data ' + str(len(self.data) + 1))
-            tk.Entry(import_options, textvariable=fileNameEntryVar).grid(column=1, row=1)
+            tk.Entry(nameEntryContainer, textvariable=fileNameEntryVar).grid(column=1, row=0, sticky='w')
 
-            tk.Label(import_options, text="Delimiter: ").grid(column=0, row=2)
+            delimiterContainer = tk.Frame(import_options)
+            delimiterContainer.grid(column=0, row=2, sticky='w')
+            tk.Label(delimiterContainer, text="Delimiter: ").grid(column=0, row=0, sticky='w')
             delimiter = tk.StringVar()
             delimiter.set(',')
-            tk.Entry(import_options, textvariable=delimiter).grid(column=1, row=2)
+            tk.Entry(delimiterContainer, textvariable=delimiter).grid(column=1, row=0, sticky='w')
 
-            tk.Label(import_options, text="Rows:", fg="black", bg="white").grid(column=0, row=3)
+            rowSelectionContainer = tk.Frame(import_options)
+            rowSelectionContainer.grid(column=0, row=3, sticky='w')
+            tk.Label(rowSelectionContainer, text="Rows:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
             rowVar = tk.IntVar()
             rowVar.set(0)
-            tk.Radiobutton(import_options, text="Cells", variable=rowVar, value=0).grid(column=1, row=3, sticky='W')
-            tk.Radiobutton(import_options, text="Genes", variable=rowVar, value=1).grid(column=2, row=3, sticky='W')
+            tk.Radiobutton(rowSelectionContainer, text="Cells", variable=rowVar, value=0).grid(column=1, row=0, sticky='W')
+            tk.Radiobutton(rowSelectionContainer, text="Genes", variable=rowVar, value=1).grid(column=2, row=0, sticky='W')
 
-            tk.Label(import_options, text="Number of additional rows/columns to skip after gene/cell names").grid(
-                     column=0, row=4, columnspan=3)
+            skipSelectionContainer = tk.Frame(import_options)
+            skipSelectionContainer.grid(column=0, row=4, sticky='w')
+            tk.Label(skipSelectionContainer, text="Number of additional rows/columns to skip after gene/cell names").grid(
+                column=0, row=0, columnspan=3, sticky='W')
 
-            tk.Label(import_options, text="Number of rows:").grid(column=0, row=5)
+            numRowContainer = tk.Frame(skipSelectionContainer)
+            numRowContainer.grid(column=0, row=1, sticky='W')
+            tk.Label(numRowContainer, text="Number of rows:").grid(column=0, row=0, sticky='W')
             rowHeader = tk.IntVar()
             rowHeader.set(0)
-            tk.Entry(import_options, textvariable=rowHeader).grid(column=1, row=5)
+            tk.Entry(numRowContainer, textvariable=rowHeader).grid(column=1, row=0, sticky='W')
 
-            tk.Label(import_options, text="Number of columns:").grid(column=2, row=5)
+            numColContainer = tk.Frame(skipSelectionContainer)
+            numColContainer.grid(column=0, row=2, sticky='W')
+            tk.Label(numColContainer, text="Number of columns:").grid(column=0, row=0, sticky='W')
             colHeader = tk.IntVar()
             colHeader.set(0)
-            tk.Entry(import_options, textvariable=colHeader).grid(column=3, row=5)
+            tk.Entry(numColContainer, textvariable=colHeader).grid(column=1, row=0, sticky='W')
 
             tk.Button(import_options, text="Compute data statistics",
-                      command=partial(self.showRawDataDistributions, file_type='csv')).grid(column=1, row=7)
+                      command=partial(self.showRawDataDistributions, file_type='csv')).grid(column=0, row=5,
+                                                                                            sticky='W', padx=8)
+
+            ttk.Separator(import_options, orient='horizontal').grid(column=0, row=6, sticky='ew', pady=8)
+
+            tk.Label(import_options, text="Filtering options (leave blank if no filtering)",
+                     fg="black", bg="white", font="bold").grid(column=0, row=7, sticky='w')
 
             # filter parameters
+            molPerCellContainer = tk.Frame(import_options)
+            molPerCellContainer.grid(column=0, row=8, sticky='w')
             filterCellMinVar = tk.StringVar()
-            tk.Label(import_options, text="Filter by molecules per cell. Min:", fg="black", bg="white").grid(column=0,
-                                                                                                              row=8)
-            tk.Entry(import_options, textvariable=filterCellMinVar).grid(column=1, row=8)
-
+            tk.Label(molPerCellContainer, text="Filter by molecules per cell  Min:",
+                     fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            tk.Entry(molPerCellContainer, textvariable=filterCellMinVar).grid(column=1, row=0, sticky='w')
             filterCellMaxVar = tk.StringVar()
-            tk.Label(import_options, text=" Max:", fg="black", bg="white").grid(column=2, row=8)
-            tk.Entry(import_options, textvariable=filterCellMaxVar).grid(column=3, row=8)
+            tk.Label(molPerCellContainer, text="Max:",
+                     fg="black", bg="white").grid(column=0, row=1, sticky='E')
+            tk.Entry(molPerCellContainer, textvariable=filterCellMaxVar).grid(column=1, row=1, sticky='w')
 
+            cellPerGeneContainer = tk.Frame(import_options)
+            cellPerGeneContainer.grid(column=0, row=9, sticky='w')
             filterGeneNonzeroVar = tk.StringVar()
-            tk.Label(import_options, text="Filter by nonzero cells per gene. Min:", fg="black", bg="white").grid(
-                     column=0, row=9)
-            tk.Entry(import_options, textvariable=filterGeneNonzeroVar).grid(column=1, row=9)
+            tk.Label(cellPerGeneContainer, text="Filter by nonzero cells per gene  Min:", fg="black", bg="white").grid(
+                column=0, row=0, sticky='w')
+            tk.Entry(cellPerGeneContainer, textvariable=filterGeneNonzeroVar).grid(column=1, row=0, sticky='w')
 
+            molPerGeneContainer = tk.Frame(import_options)
+            molPerGeneContainer.grid(column=0, row=10, sticky='w')
             filterGeneMolsVar = tk.StringVar()
-            tk.Label(import_options, text="Filter by molecules per gene. Min:", fg="black", bg="white").grid(column=0,
-                                                                                                              row=10)
-            tk.Entry(import_options, textvariable=filterGeneMolsVar).grid(column=1, row=10)
+            tk.Label(molPerGeneContainer, text="Filter by molecules per gene. Min:",
+                     fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            tk.Entry(molPerGeneContainer, textvariable=filterGeneMolsVar).grid(column=1, row=0, sticky='w')
 
+            # horizontal separator
+            ttk.Separator(import_options, orient='horizontal').grid(column=0, row=11, sticky='ew', pady=8)
+
+            tk.Label(import_options, text="Data pre-processing options",
+                     fg="black", bg="white").grid(column=0, row=12, sticky='w')
+
+            checkButtonContainer = tk.Frame(import_options)
+            checkButtonContainer.grid(column=0, row=13, sticky='w')
             # normalize
             normalizeVar = tk.BooleanVar()
             normalizeVar.set(True)
-            tk.Checkbutton(import_options, text="Normalize by library size", variable=normalizeVar).grid(column=0,
-                                                                                                         row=11)
-
+            tk.Checkbutton(checkButtonContainer, text="Normalize by library size",
+                           variable=normalizeVar).grid(column=0, row=0, sticky='w')
             # log transform
             logTransform = tk.BooleanVar()
             logTransform.set(True)
-            tk.Checkbutton(import_options, text="Log-transform data", variable=logTransform).grid(column=1, row=11)
-
+            tk.Checkbutton(checkButtonContainer,
+                           text="Log-transform data", variable=logTransform).grid(column=1, row=0, sticky='w')
             # MAGIC
             magicVar = tk.BooleanVar()
             magicVar.set(True)
-            tk.Checkbutton(import_options, text="Run MAGIC on the data", variable=magicVar).grid(column=2, row=11)
+            tk.Checkbutton(checkButtonContainer,
+                           text="Run MAGIC on the data", variable=magicVar).grid(column=3, row=0, sticky='w')
 
-            # pop up for magic option
-            tk.Label(import_options, text="MAGIC options", pady=5).grid(column=1, row=12)
+            # MAGIC options
+            tk.Label(import_options, text="MAGIC options").grid(column=0, row=14, pady=8, sticky='w')
 
-            tk.Label(import_options, text="# of PCA components:", fg="black", bg="white").grid(column=0, row=13)
-            self.nCompVar = tk.IntVar()
-            self.nCompVar.set(20)
-            tk.Entry(import_options, textvariable=self.nCompVar).grid(column=1, row=13)
-
+            mgPCACompContainer = tk.Frame(import_options)
+            mgPCACompContainer.grid(column=0, row=15, sticky='w')
+            tk.Label(mgPCACompContainer, text="Number of PCA components:", fg="black", bg="white").grid(column=0, row=0)
+            self.mgCompVar = tk.IntVar()
+            self.mgCompVar.set(20)
+            tk.Entry(mgPCACompContainer, textvariable=self.mgCompVar, state='disabled').grid(column=1, row=0)
             self.randomVar = tk.BooleanVar()
             self.randomVar.set(True)
-            tk.Checkbutton(import_options, text="Randomized PCA", variable=self.randomVar).grid(column=0, row=14,
-                                                                                                columnspan=2)
+            tk.Checkbutton(mgPCACompContainer,
+                           text="Randomized PCA", variable=self.randomVar,
+                           state='disabled').grid(column=1, row=1, sticky='W')
 
-            tk.Label(import_options, text="t:", fg="black", bg="white").grid(column=0, row=15)
+            mgTContainer = tk.Frame(import_options)
+            mgTContainer.grid(column=0, row=16, sticky='W')
+            tk.Label(mgTContainer, text="t:", fg="black", bg="white").grid(column=0, row=0, sticky='W')
             self.tVar = tk.IntVar()
             self.tVar.set(6)
-            tk.Entry(import_options, textvariable=self.tVar).grid(column=1, row=15)
+            tk.Entry(mgTContainer, textvariable=self.tVar, state='disabled').grid(column=1, row=0, sticky='W')
 
-            tk.Label(import_options, text="k:", fg="black", bg="white").grid(column=0, row=16)
+            mgKContainer = tk.Frame(import_options)
+            mgKContainer.grid(column=0, row=17, sticky='w')
+            tk.Label(mgKContainer, text="k:", fg="black", bg="white").grid(column=0, row=0, sticky='W')
             self.kVar = tk.IntVar()
             self.kVar.set(30)
-            tk.Entry(import_options, textvariable=self.kVar).grid(column=1, row=16)
+            tk.Entry(mgKContainer, textvariable=self.kVar, state='disabled').grid(column=1, row=0, sticky='W')
 
-            tk.Label(import_options, text="ka:", fg="black", bg="white").grid(column=0, row=17)
+            mgKaContainer = tk.Frame(import_options)
+            mgKaContainer.grid(column=0, row=18, sticky='w')
+            tk.Label(mgKaContainer, text="ka:", fg="black", bg="white").grid(column=0, row=0, sticky='W')
             self.autotuneVar = tk.IntVar()
             self.autotuneVar.set(10)
-            tk.Entry(import_options, textvariable=self.autotuneVar).grid(column=1, row=17)
+            tk.Entry(mgKaContainer, textvariable=self.autotuneVar, state='disabled').grid(column=1, row=0, sticky='W')
 
-            tk.Label(import_options, text="Epsilon:", fg="black", bg="white").grid(column=0, row=18)
+            mgEpContainer = tk.Frame(import_options)
+            mgEpContainer.grid(column=0, row=19, sticky='w')
+            tk.Label(mgEpContainer, text="Epsilon:", fg="black", bg="white").grid(column=0, row=0, sticky='W')
             self.epsilonVar = tk.IntVar()
             self.epsilonVar.set(1)
-            tk.Entry(import_options, textvariable=self.epsilonVar).grid(column=1, row=18)
+            tk.Entry(mgEpContainer, textvariable=self.epsilonVar, state='disabled').grid(column=1, row=0, sticky='W')
+            tk.Label(mgEpContainer, text="(0 is the uniform kernel)",
+                     fg="black", bg="white").grid(column=2, row=0)
 
-            tk.Label(import_options, text="(Epsilon 0 is the uniform kernel)", fg="black", bg="white").grid(
-                column=0, columnspan=2, row=19)
-
+            mgRescaleContainer = tk.Frame(import_options)
+            mgRescaleContainer.grid(column=0, row=20, sticky='w')
             self.rescaleVar = tk.IntVar()
             self.rescaleVar.set(99)
-            tk.Label(import_options, text="Rescale data to ", fg="black", bg="white").grid(column=0, row=20)
-            tk.Entry(import_options, textvariable=self.rescaleVar).grid(column=1, row=20)
-            tk.Label(import_options, text=" percentile", fg="black", bg="white").grid(column=2, row=20)
-            tk.Label(import_options, text="0 is no rescale (use for log-transformed data).").grid(row=20, column=3,
-                                                                                                  columnspan=2)
+            tk.Label(mgRescaleContainer, text="Rescale data to ",
+                     fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            tk.Entry(mgRescaleContainer, textvariable=self.rescaleVar,
+                     state='disabled').grid(column=1, row=0, sticky='w')
+            tk.Label(mgRescaleContainer, text=" percentile (use 0 for log-transformed data)",
+                     fg="black", bg="white").grid(column=2, row=0, sticky='w')
 
-            tk.Button(import_options, text="Cancel", command=import_options.destroy).grid(column=1, row=21)
-            tk.Button(import_options, text="Load", command=partial(self.process_data, file_type='csv')).grid(column=2,
-                                                                                                             row=21)
+            finalButtonContainer = tk.Frame(import_options)
+            finalButtonContainer.grid(column=0, row=21)
+            tk.Button(finalButtonContainer, text="Cancel", command=import_options.destroy).grid(column=0, row=0, padx=20)
+            tk.Button(finalButtonContainer, text="Load",
+                      command=partial(self.process_data, file_type='csv')).grid(column=1, row=0, padx=20)
+
             self.wait_window(import_options)
 
     def load_mtx(self):
