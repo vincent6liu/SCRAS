@@ -79,41 +79,43 @@ class SCRASGui(tk.Tk):
         self.focus_force()
 
     def load_csv(self):
-        filename = filedialog.askopenfilename(title='Load data file', initialdir='~/.magic/data')
+        self.filename = filedialog.askopenfilename(title='Load data file', initialdir='~/.magic/data')
 
-        if filename:
-            import_options = tk.Toplevel()
-            import_options.resizable(False, False)
-            import_options.title('Import options')
+        if self.filename:
+            self.import_options = tk.Toplevel()
+            self.import_options.resizable(False, False)
+            self.import_options.title('Import options')
 
-            fileNameContainer = tk.Frame(import_options)
+            fileNameContainer = tk.Frame(self.import_options)
             fileNameContainer.grid(column=0, row=0, sticky='w')
             tk.Label(fileNameContainer, text="File name: ", pady=5).grid(column=0, row=0, sticky='w')
-            tk.Label(fileNameContainer, text=filename.split('/')[-1]).grid(column=1, row=0, sticky='w')
+            tk.Label(fileNameContainer, text=self.filename.split('/')[-1]).grid(column=1, row=0, sticky='w')
 
-            nameEntryContainer = tk.Frame(import_options)
+            nameEntryContainer = tk.Frame(self.import_options)
             nameEntryContainer.grid(column=0, row=1, sticky='w')
             tk.Label(nameEntryContainer, text="Data name: ").grid(column=0, row=0, sticky='w')
-            fileNameEntryVar = tk.StringVar()
-            fileNameEntryVar.set('Data ' + str(len(self.data) + 1))
-            tk.Entry(nameEntryContainer, textvariable=fileNameEntryVar).grid(column=1, row=0, sticky='w')
+            self.fileNameEntryVar = tk.StringVar()
+            self.fileNameEntryVar.set('Data ' + str(len(self.data) + 1))
+            tk.Entry(nameEntryContainer, textvariable=self.fileNameEntryVar).grid(column=1, row=0, sticky='w')
 
-            delimiterContainer = tk.Frame(import_options)
+            delimiterContainer = tk.Frame(self.import_options)
             delimiterContainer.grid(column=0, row=2, sticky='w')
             tk.Label(delimiterContainer, text="Delimiter: ").grid(column=0, row=0, sticky='w')
-            delimiter = tk.StringVar()
-            delimiter.set(',')
-            tk.Entry(delimiterContainer, textvariable=delimiter).grid(column=1, row=0, sticky='w')
+            self.delimiter = tk.StringVar()
+            self.delimiter.set(',')
+            tk.Entry(delimiterContainer, textvariable=self.delimiter).grid(column=1, row=0, sticky='w')
 
-            rowSelectionContainer = tk.Frame(import_options)
+            rowSelectionContainer = tk.Frame(self.import_options)
             rowSelectionContainer.grid(column=0, row=3, sticky='w')
             tk.Label(rowSelectionContainer, text="Rows:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
-            rowVar = tk.IntVar()
-            rowVar.set(0)
-            tk.Radiobutton(rowSelectionContainer, text="Cells", variable=rowVar, value=0).grid(column=1, row=0, sticky='W')
-            tk.Radiobutton(rowSelectionContainer, text="Genes", variable=rowVar, value=1).grid(column=2, row=0, sticky='W')
+            self.rowVar = tk.IntVar()
+            self.rowVar.set(0)
+            tk.Radiobutton(rowSelectionContainer, text="Cells",
+                           variable=self.rowVar, value=0).grid(column=1, row=0, sticky='W')
+            tk.Radiobutton(rowSelectionContainer, text="Genes",
+                           variable=self.rowVar, value=1).grid(column=2, row=0, sticky='W')
 
-            skipSelectionContainer = tk.Frame(import_options)
+            skipSelectionContainer = tk.Frame(self.import_options)
             skipSelectionContainer.grid(column=0, row=4, sticky='w')
             tk.Label(skipSelectionContainer, text="Number of additional rows/columns to skip after gene/cell names").grid(
                 column=0, row=0, columnspan=3, sticky='W')
@@ -121,181 +123,278 @@ class SCRASGui(tk.Tk):
             numRowContainer = tk.Frame(skipSelectionContainer)
             numRowContainer.grid(column=0, row=1, sticky='W')
             tk.Label(numRowContainer, text="Number of rows:").grid(column=0, row=0, sticky='W')
-            rowHeader = tk.IntVar()
-            rowHeader.set(0)
-            tk.Entry(numRowContainer, textvariable=rowHeader).grid(column=1, row=0, sticky='W')
+            self.rowHeader = tk.IntVar()
+            self.rowHeader.set(0)
+            tk.Entry(numRowContainer, textvariable=self.rowHeader).grid(column=1, row=0, sticky='W')
 
             numColContainer = tk.Frame(skipSelectionContainer)
             numColContainer.grid(column=0, row=2, sticky='W')
             tk.Label(numColContainer, text="Number of columns:").grid(column=0, row=0, sticky='W')
-            colHeader = tk.IntVar()
-            colHeader.set(0)
-            tk.Entry(numColContainer, textvariable=colHeader).grid(column=1, row=0, sticky='W')
+            self.colHeader = tk.IntVar()
+            self.colHeader.set(0)
+            tk.Entry(numColContainer, textvariable=self.colHeader).grid(column=1, row=0, sticky='W')
 
-            tk.Button(import_options, text="Compute data statistics",
+            tk.Button(self.import_options, text="Compute data statistics",
                       command=partial(self.showRawDataDistributions, file_type='csv')).grid(column=0, row=5,
                                                                                             sticky='W', padx=8)
 
-            ttk.Separator(import_options, orient='horizontal').grid(column=0, row=6, sticky='ew', pady=8)
+            ttk.Separator(self.import_options, orient='horizontal').grid(column=0, row=6, sticky='ew', pady=8)
 
-            tk.Label(import_options, text="Filtering options (leave blank if no filtering)",
+            tk.Label(self.import_options, text="Filtering options (leave blank if no filtering)",
                      fg="black", bg="white", font="bold").grid(column=0, row=7, sticky='w')
 
             # filter parameters
-            molPerCellContainer = tk.Frame(import_options)
+            molPerCellContainer = tk.Frame(self.import_options)
             molPerCellContainer.grid(column=0, row=8, sticky='w')
-            filterCellMinVar = tk.StringVar()
+            self.filterCellMinVar = tk.StringVar()
             tk.Label(molPerCellContainer, text="Filter by molecules per cell  Min:",
                      fg="black", bg="white").grid(column=0, row=0, sticky='w')
-            tk.Entry(molPerCellContainer, textvariable=filterCellMinVar).grid(column=1, row=0, sticky='w')
-            filterCellMaxVar = tk.StringVar()
+            tk.Entry(molPerCellContainer, textvariable=self.filterCellMinVar).grid(column=1, row=0, sticky='w')
+            self.filterCellMaxVar = tk.StringVar()
             tk.Label(molPerCellContainer, text="Max:",
                      fg="black", bg="white").grid(column=0, row=1, sticky='E')
-            tk.Entry(molPerCellContainer, textvariable=filterCellMaxVar).grid(column=1, row=1, sticky='w')
+            tk.Entry(molPerCellContainer, textvariable=self.filterCellMaxVar).grid(column=1, row=1, sticky='w')
 
-            cellPerGeneContainer = tk.Frame(import_options)
+            cellPerGeneContainer = tk.Frame(self.import_options)
             cellPerGeneContainer.grid(column=0, row=9, sticky='w')
-            filterGeneNonzeroVar = tk.StringVar()
+            self.filterGeneNonzeroVar = tk.StringVar()
             tk.Label(cellPerGeneContainer, text="Filter by nonzero cells per gene  Min:", fg="black", bg="white").grid(
                 column=0, row=0, sticky='w')
-            tk.Entry(cellPerGeneContainer, textvariable=filterGeneNonzeroVar).grid(column=1, row=0, sticky='w')
+            tk.Entry(cellPerGeneContainer, textvariable=self.filterGeneNonzeroVar).grid(column=1, row=0, sticky='w')
 
-            molPerGeneContainer = tk.Frame(import_options)
+            molPerGeneContainer = tk.Frame(self.import_options)
             molPerGeneContainer.grid(column=0, row=10, sticky='w')
-            filterGeneMolsVar = tk.StringVar()
+            self.filterGeneMolsVar = tk.StringVar()
             tk.Label(molPerGeneContainer, text="Filter by molecules per gene. Min:",
                      fg="black", bg="white").grid(column=0, row=0, sticky='w')
-            tk.Entry(molPerGeneContainer, textvariable=filterGeneMolsVar).grid(column=1, row=0, sticky='w')
+            tk.Entry(molPerGeneContainer, textvariable=self.filterGeneMolsVar).grid(column=1, row=0, sticky='w')
 
             # horizontal separator
-            ttk.Separator(import_options, orient='horizontal').grid(column=0, row=11, sticky='ew', pady=8)
+            ttk.Separator(self.import_options, orient='horizontal').grid(column=0, row=11, sticky='ew', pady=8)
 
-            tk.Label(import_options, text="Data pre-processing options",
+            tk.Label(self.import_options, text="Data pre-processing options",
                      fg="black", bg="white").grid(column=0, row=12, sticky='w')
 
-            checkButtonContainer = tk.Frame(import_options)
+            checkButtonContainer = tk.Frame(self.import_options)
             checkButtonContainer.grid(column=0, row=13, sticky='w')
             # normalize
-            normalizeVar = tk.BooleanVar()
-            normalizeVar.set(True)
+            self.normalizeVar = tk.BooleanVar()
+            self.normalizeVar.set(True)
             tk.Checkbutton(checkButtonContainer, text="Normalize by library size",
-                           variable=normalizeVar).grid(column=0, row=0, sticky='w')
+                           variable=self.normalizeVar).grid(column=0, row=0, sticky='w')
             # log transform
-            logTransform = tk.BooleanVar()
-            logTransform.set(True)
+            self.logTransform = tk.BooleanVar()
+            self.logTransform.set(True)
             tk.Checkbutton(checkButtonContainer,
-                           text="Log-transform data", variable=logTransform).grid(column=1, row=0, sticky='w')
+                           text="Log-transform data", variable=self.logTransform).grid(column=1, row=0, sticky='w')
             # MAGIC
-            magicVar = tk.BooleanVar()
-            magicVar.set(True)
+            self.magicVar = tk.BooleanVar()
+            self.magicVar.set(True)
             tk.Checkbutton(checkButtonContainer,
-                           text="Run MAGIC on the data", variable=magicVar).grid(column=3, row=0, sticky='w')
+                           text="Run MAGIC on the data", variable=self.magicVar).grid(column=3, row=0, sticky='w')
 
             # MAGIC options
-            tk.Label(import_options, text="MAGIC options").grid(column=0, row=14, pady=8, sticky='w')
+            tk.Label(self.import_options, text="MAGIC options").grid(column=0, row=14, pady=8, sticky='w')
 
-            mgPCACompContainer = tk.Frame(import_options)
+            mgPCACompContainer = tk.Frame(self.import_options)
             mgPCACompContainer.grid(column=0, row=15, sticky='w')
             tk.Label(mgPCACompContainer, text="Number of PCA components:", fg="black", bg="white").grid(column=0, row=0)
             self.mgCompVar = tk.IntVar()
             self.mgCompVar.set(20)
             tk.Entry(mgPCACompContainer, textvariable=self.mgCompVar, state='disabled').grid(column=1, row=0)
-            self.randomVar = tk.BooleanVar()
-            self.randomVar.set(True)
+            self.mgRandomVar = tk.BooleanVar()
+            self.mgRandomVar.set(True)
             tk.Checkbutton(mgPCACompContainer,
-                           text="Randomized PCA", variable=self.randomVar,
+                           text="Randomized PCA", variable=self.mgRandomVar,
                            state='disabled').grid(column=1, row=1, sticky='W')
 
-            mgTContainer = tk.Frame(import_options)
+            mgTContainer = tk.Frame(self.import_options)
             mgTContainer.grid(column=0, row=16, sticky='W')
             tk.Label(mgTContainer, text="t:", fg="black", bg="white").grid(column=0, row=0, sticky='W')
-            self.tVar = tk.IntVar()
-            self.tVar.set(6)
-            tk.Entry(mgTContainer, textvariable=self.tVar, state='disabled').grid(column=1, row=0, sticky='W')
+            self.mgTVar = tk.IntVar()
+            self.mgTVar.set(6)
+            tk.Entry(mgTContainer, textvariable=self.mgTVar, state='disabled').grid(column=1, row=0, sticky='W')
 
-            mgKContainer = tk.Frame(import_options)
+            mgKContainer = tk.Frame(self.import_options)
             mgKContainer.grid(column=0, row=17, sticky='w')
             tk.Label(mgKContainer, text="k:", fg="black", bg="white").grid(column=0, row=0, sticky='W')
-            self.kVar = tk.IntVar()
-            self.kVar.set(30)
-            tk.Entry(mgKContainer, textvariable=self.kVar, state='disabled').grid(column=1, row=0, sticky='W')
+            self.mgKVar = tk.IntVar()
+            self.mgKVar.set(30)
+            tk.Entry(mgKContainer, textvariable=self.mgKVar, state='disabled').grid(column=1, row=0, sticky='W')
 
-            mgKaContainer = tk.Frame(import_options)
+            mgKaContainer = tk.Frame(self.import_options)
             mgKaContainer.grid(column=0, row=18, sticky='w')
             tk.Label(mgKaContainer, text="ka:", fg="black", bg="white").grid(column=0, row=0, sticky='W')
-            self.autotuneVar = tk.IntVar()
-            self.autotuneVar.set(10)
-            tk.Entry(mgKaContainer, textvariable=self.autotuneVar, state='disabled').grid(column=1, row=0, sticky='W')
+            self.mgKaVar = tk.IntVar()
+            self.mgKaVar.set(10)
+            tk.Entry(mgKaContainer, textvariable=self.mgKaVar, state='disabled').grid(column=1, row=0, sticky='W')
 
-            mgEpContainer = tk.Frame(import_options)
+            mgEpContainer = tk.Frame(self.import_options)
             mgEpContainer.grid(column=0, row=19, sticky='w')
             tk.Label(mgEpContainer, text="Epsilon:", fg="black", bg="white").grid(column=0, row=0, sticky='W')
-            self.epsilonVar = tk.IntVar()
-            self.epsilonVar.set(1)
-            tk.Entry(mgEpContainer, textvariable=self.epsilonVar, state='disabled').grid(column=1, row=0, sticky='W')
+            self.mgEpVar = tk.IntVar()
+            self.mgEpVar.set(1)
+            tk.Entry(mgEpContainer, textvariable=self.mgEpVar, state='disabled').grid(column=1, row=0, sticky='W')
             tk.Label(mgEpContainer, text="(0 is the uniform kernel)",
                      fg="black", bg="white").grid(column=2, row=0)
 
-            mgRescaleContainer = tk.Frame(import_options)
+            mgRescaleContainer = tk.Frame(self.import_options)
             mgRescaleContainer.grid(column=0, row=20, sticky='w')
-            self.rescaleVar = tk.IntVar()
-            self.rescaleVar.set(99)
+            self.mgrRscaleVar = tk.IntVar()
+            self.mgrRscaleVar.set(99)
             tk.Label(mgRescaleContainer, text="Rescale data to ",
                      fg="black", bg="white").grid(column=0, row=0, sticky='w')
-            tk.Entry(mgRescaleContainer, textvariable=self.rescaleVar,
+            tk.Entry(mgRescaleContainer, textvariable=self.mgrRscaleVar,
                      state='disabled').grid(column=1, row=0, sticky='w')
             tk.Label(mgRescaleContainer, text=" percentile (use 0 for log-transformed data)",
                      fg="black", bg="white").grid(column=2, row=0, sticky='w')
 
-            finalButtonContainer = tk.Frame(import_options)
+            finalButtonContainer = tk.Frame(self.import_options)
             finalButtonContainer.grid(column=0, row=21)
-            tk.Button(finalButtonContainer, text="Cancel", command=import_options.destroy).grid(column=0, row=0, padx=20)
+            tk.Button(finalButtonContainer, text="Cancel", command=self.import_options.destroy).grid(column=0, row=0, padx=20)
             tk.Button(finalButtonContainer, text="Load",
                       command=partial(self.process_data, file_type='csv')).grid(column=1, row=0, padx=20)
 
-            self.wait_window(import_options)
+            self.wait_window(self.import_options)
 
     def load_mtx(self):
-        pass
+        pass  # to be implemented
 
     def load_10x(self):
-        pass
+        pass  # to be implemented
 
     def load_pickle(self):
-        pass
+        pass  # to be implemented
 
     def showRawDataDistributions(self):
-        pass
+        pass  # to be implemented
 
-    def process_data(self, file_type):
-        pass
+    def process_data(self, file_type='csv'):
+
+        if len(self.data) == 0:
+            # clear intro screen
+            for item in self.grid_slaves():
+                item.grid_forget()
+
+            # list for datasets
+            self.data_list = ttk.Treeview()
+            self.data_list.heading('#0', text='Data sets')
+            self.data_list.grid(column=0, row=0, rowspan=6, sticky='NSEW')
+            self.data_list.bind('<BackSpace>', self._deleteDataItem)
+            self.data_list.bind('<<TreeviewSelect>>', self._updateSelection)
+            # make Treeview scrollable
+            ysb = ttk.Scrollbar(orient=tk.VERTICAL, command=self.data_list.yview)
+            xsb = ttk.Scrollbar(orient=tk.HORIZONTAL, command=self.data_list.xview)
+            self.data_list.configure(yscroll=ysb.set, xscroll=xsb.set)
+
+            # list for features of the selected dataset
+            self.data_detail = ttk.Treeview()
+            self.data_detail.heading('#0', text='Features')
+            self.data_detail.grid(column=0, row=6, rowspan=6, sticky='NSEW')
+            ysb2 = ttk.Scrollbar(orient=tk.VERTICAL, command=self.data_detail.yview)
+            xsb2 = ttk.Scrollbar(orient=tk.HORIZONTAL, command=self.data_detail.xview)
+            self.data_detail.configure(yscroll=ysb2.set, xscroll=xsb2.set)
+
+            # operation history of the selected dataset
+            self.data_history = ttk.Treeview()
+            self.data_history.heading('#0', text='Data history')
+            self.data_history.grid(column=0, row=12, rowspan=2, sticky='NSEW')
+            ysb3 = ttk.Scrollbar(orient=tk.VERTICAL, command=self.data_history.yview)
+            xsb3 = ttk.Scrollbar(orient=tk.HORIZONTAL, command=self.data_history.xview)
+            self.data_history.configure(yscroll=ysb3.set, xscroll=xsb3.set)
+
+            self.notebook = ttk.Notebook(height=600, width=600)
+            self.notebook.grid(column=1, row=0, rowspan=14, columnspan=4, sticky='NSEW')
+            self.tabs = []
+
+        if file_type == 'csv':  # sc-seq data
+            scdata = mg.SCData.from_csv(os.path.expanduser(self.filename), data_name=self.fileNameEntryVar.get(),
+                                        data_type='sc-seq', cell_axis=self.rowVar.get(),
+                                        delimiter=self.delimiter.get(),
+                                        rows_after_header_to_skip=self.rowHeader.get(),
+                                        cols_after_header_to_skip=self.colHeader.get())
+
+        elif file_type == 'mtx':  # sparse matrix
+            pass  # to be implemented
+
+        elif file_type == '10x':
+            pass  # to be implemented
+
+        if file_type != 'pickle':
+            # filter the data
+            if len(self.filterCellMinVar.get()) > 0 or len(self.filterCellMaxVar.get()) > 0 or \
+               len(self.filterGeneNonzeroVar.get()) > 0 or len(self.filterGeneMolsVar.get()) > 0:
+                scdata.filter_scseq_data(
+                    filter_cell_min=int(self.filterCellMinVar.get()) if len(self.filterCellMinVar.get()) > 0 else 0,
+                    filter_cell_max=int(self.filterCellMaxVar.get()) if len(self.filterCellMaxVar.get()) > 0 else 0,
+                    filter_gene_nonzero=int(self.filterGeneNonzeroVar.get()) if len(
+                        self.filterGeneNonzeroVar.get()) > 0 else 0,
+                    filter_gene_mols=int(self.filterGeneMolsVar.get()) if len(self.filterGeneMolsVar.get()) > 0 else 0)
+
+            if self.normalizeVar.get() is True:
+                scdata.normalize_scseq_data()
+
+            if self.logTransform.get() is True:
+                scdata.log_transform_scseq_data()
+
+            if self.magicVar.get() is True:
+                scdata.run_magic(self.mgCompVar.get(), self.mgRandomVar.get(), self.mgTVar.get(), self.mgKVar.get(),
+                                 self.mgKaVar.get(), self.mgEpVar.get(), self.mgrRscaleVar.get())
+
+        else:  # pickled Wishbone object
+            pass  # to be implemented
+
+        self.data[self.fileNameEntryVar.get()] = scdata
+        self.data_list.insert('', 'end', text=self.fileNameEntryVar.get() +
+                                         ' (' + str(scdata.data.shape[0]) +
+                                         ' x ' + str(scdata.data.shape[1]) + ')', open=True)
+
+        # enable buttons
+        self.fileMenu.entryconfig(5, state='normal')
+        self.analysisMenu.entryconfig(0, state='normal')
+        self.analysisMenu.entryconfig(1, state='normal')
+        self.visMenu.entryconfig(0, state='normal')
+        self.visMenu.entryconfig(1, state='normal')
+
+        if len(self.data) > 1:
+            self.fileMenu.entryconfig(4, state='normal')
+
+        self.geometry('1000x650')
+
+        self.import_options.destroy()
+
+    def _deleteDataItem(self):
+        pass  # to be implemented
+
+    def _updateSelection(self):
+        pass  # to be implemented
 
     def concatenate_data(self):
-        pass
+        pass  # to be implemented
 
     def save_data(self):
-        pass
+        pass  # to be implemented
 
     def save_plot(self):
-        pass
+        pass  # to be implemented
 
     def run_dr(self):
-        pass
+        pass  # to be implemented
 
     def run_clustering(self):
-        pass
+        pass  # to be implemented
 
     def run_gea(self):
-        pass
+        pass  # to be implemented
 
     def tsne(self):
-        pass
+        pass  # to be implemented
 
     def scatter_plot(self):
-        pass
+        pass  # to be implemented
 
     def quit_scras(self):
-        pass
+        pass  # to be implemented
 
 
 def launch():

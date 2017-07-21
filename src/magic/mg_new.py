@@ -41,6 +41,7 @@ from scipy.io import mmread
 from numpy.core.umath_tests import inner1d
 import fcsparser
 import sys
+
 sys.path.insert(0, '/Users/vincentliu/PycharmProjects/magic/src/magic')
 import MAGIC
 import phenograph
@@ -149,7 +150,7 @@ class SCData:
         # initiate the data dictionary with the given data
         self._name = name
         cols = [np.array(data.columns.values)]
-        self._datadict = {'original '+name: pd.DataFrame(data.values, index=data.index, columns=cols)}
+        self._datadict = {'original ' + name: pd.DataFrame(data.values, index=data.index, columns=cols)}
         self._data_type = data_type
         self._metadata = metadata
 
@@ -211,7 +212,7 @@ class SCData:
     # returns the raw data
     @property
     def data(self):
-        return self._datadict['original '+self.name]
+        return self._datadict['original ' + self.name]
 
     @data.setter
     def data(self, item):
@@ -219,7 +220,7 @@ class SCData:
             raise TypeError('SCData.data must be of type DataFrame')
         self.reset()
         cols = [np.array(item.columns.values)]
-        self._datadict = {'original '+self.name: pd.DataFrame(item.values, index=item.index, columns=cols)}
+        self._datadict = {'original ' + self.name: pd.DataFrame(item.values, index=item.index, columns=cols)}
 
     @property
     def metadata(self):
@@ -410,6 +411,7 @@ class SCData:
 
         if len(self.operation.history) != 1:
             print("data must be filtered before any other operation is performed")
+
         else:
             sums = self.data.sum(axis=1)
             to_keep = np.intersect1d(np.where(sums >= filter_cell_min)[0],
@@ -426,6 +428,8 @@ class SCData:
                 to_keep = np.where(sums >= filter_gene_mols)[0]
                 self.data = self.data.loc[:, to_keep].astype(np.float32)
 
+            self.operation.add("FILTERED")
+
     def log_transform_scseq_data(self):
         if 'LOGTRANS' in self.operation.history:
             return
@@ -435,43 +439,26 @@ class SCData:
 
     def run_magic(self, n_pca_components=20, random_pca=True, t=6, k=30, ka=10, epsilon=1, rescale_percent=99):
 
-        newpca = False
-        og_name = self.name if self.name.find(':') == -1 else self.name[:self.name.find(':')]
+        MAGICed = [x for x in self.operation.history if 'MAGIC' in x]
 
-        pca_keys = [pca_key for pca_key in self.datadict.keys() if 'PCA' in pca_key.upper()]
-        comps = []
-        if bool(pca_keys):
-            comps = sorted([int(key[key.rfind(':') + 1:]) for key in pca_keys])
-            low_comp = min(comps)
+        if MAGICed:
+            print('already ran MAGIC on the current data')
+            return
 
-        # Work on PCA projections if data is single cell RNA-seq
-        if self.data_type == 'sc-seq' and n_pca_components > 0:
-            if n_pca_components in comps:
-                pca_data = self.datadict[(og_name + ":PCA:" + str(n_pca_components))]
-            elif (not bool(pca_keys)) or n_pca_components > low_comp:
-                self.run_pca(n_components=n_pca_components)
-                newpca = True
-                pca_data = self.datadict[(og_name + ":PCA:" + str(n_pca_components))]
-            else:  # n_components <= low_comp
-                pca_data = self.datadict[(og_name + ":PCA:" + str(low_comp))].iloc[:, :n_pca_components]
         else:
-            pca_data = self
+            pca_data = self.run_pca(n_pca_components, random_pca, no_effect=True)
 
-        new_data = MAGIC.magic(self.data.values, pca_data.data.values,
-                               t=t, k=k, ka=ka, epsilon=epsilon, rescale=rescale_percent)
-        new_data = pd.DataFrame(new_data, index=self.data.index, columns=self.data.columns)
+            new_data = MAGIC.magic(self.data.values, pca_data.data.values,
+                                   t=t, k=k, ka=ka, epsilon=epsilon, rescale=rescale_percent)
+            new_data = pd.DataFrame(new_data, index=self.data.index, columns=self.data.columns)
 
-        # Construct class object
-        par = '-'.join((str(n_pca_components), str(random_pca), str(t), str(k),
-                        str(ka), str(epsilon), str(rescale_percent)))
-        key = pca_data.operation.history[0] + ":MAGIC:" + par
-        scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
-        scdata.operation.add('MAGIC', par)
-        self.datadict[key] = scdata
+            # Construct class object
+            par = '-'.join((str(n_pca_components), str(random_pca), str(t), str(k),
+                            str(ka), str(epsilon), str(rescale_percent)))
+            self.data = new_data
+            self.operation.add('MAGIC', par)
 
-        return scdata, newpca
-
-    def run_pca(self, n_components=100, rand=True):
+    def run_pca(self, n_components=100, rand=True, no_effect=False):
         """
         Principal component analysis of the data.
         Note: Column values for the old method are (dataname, PCX) now its just PCX
@@ -484,10 +471,14 @@ class SCData:
         new_data = pd.DataFrame(data=pca.fit_transform(self.data.values), index=self.data.index,
                                 columns=['PC' + str(i) for i in range(1, n_components + 1)])
 
-        ogname = self.operation.history[0] + ":PCA:" + str(n_components)
+        key = self.operation.history[0] + ":PCA:" + str(n_components)
         scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
         scdata.operation.add('PCA', str(n_components))
-        self.datadict[ogname] = scdata
+
+        if not no_effect:
+            self.datadict[key] = scdata
+        else:
+            pass
 
         return scdata
 
