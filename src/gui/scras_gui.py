@@ -363,11 +363,62 @@ class SCRASGui(tk.Tk):
 
         self.import_options.destroy()
 
-    def _deleteDataItem(self):
-        pass  # to be implemented
+    def _deleteDataItem(self, event):
+        self.data_detail.delete(*self.data_detail.get_children())
+        self.data_history.delete(*self.data_history.get_children())
 
-    def _updateSelection(self):
-        pass  # to be implemented
+        for key in self.data_list.selection():
+            self.curKey = key
+            name = self.data_list.item(self.curKey, 'text').split(' (')[0]
+            og_name = name if name.find(':') == -1 else name[:name.find(':')]
+            # find the operation sequence of the parent dataset and use it to find the corresponding SCData object
+            parentID = self.data_list.parent(self.curKey)
+            if parentID:
+                opseq = self._datafinder(self.data_list, parentID)
+                og = self.data[og_name]
+                scobj = mg.SCData.retrieve_data(og, opseq)
+                scobj.datadict.pop(name)
+            else:
+                del self.data[og_name]
+
+            self.data_list.delete(key)
+
+    def _updateSelection(self, event):
+        self.data_detail.delete(*self.data_detail.get_children())
+        self.data_history.delete(*self.data_history.get_children())
+
+        for key in self.data_list.selection():
+            name = self.data_list.item(key)['text'].split(' (')[0]
+
+            opseq = self._datafinder(self.data_list, key)
+            og = self.data[opseq[0]]
+            curdata = mg.SCData.retrieve_data(og, opseq)
+
+            for op in curdata.operation.history:
+                self.data_history.insert('', 'end', text=op, open=True)
+
+            magic = True if 'MAGIC' in name else False
+
+            if 'PCA' in name:
+                for i in range(curdata.data.shape[1]):
+                    if magic:
+                        self.data_detail.insert('', 'end', text='MAGIC PC' + str(i + 1), open=True)
+                    else:
+                        self.data_detail.insert('', 'end', text='PC' + str(i + 1), open=True)
+
+            elif 'DM' in name:
+                for i in range(curdata.data.shape[1]):
+                    if magic:
+                        self.data_detail.insert('', 'end', text='MAGIC DC' + str(i + 1), open=True)
+                    else:
+                        self.data_detail.insert('', 'end', text='DC' + str(i + 1), open=True)
+
+            else:
+                for gene in curdata.data:
+                    if magic:
+                        self.data_detail.insert('', 'end', text='MAGIC ' + gene, open=True)
+                    else:
+                        self.data_detail.insert('', 'end', text=gene, open=True)
 
     def concatenate_data(self):
         pass  # to be implemented
@@ -392,6 +443,30 @@ class SCRASGui(tk.Tk):
 
     def scatter_plot(self):
         pass  # to be implemented
+
+    @staticmethod
+    def _keygen(name: str, op: str, params: list):
+        par = params[0] if len(params) == 1 else "-".join(params)
+        key = name + ':' + op + ':' + par
+
+        return key
+
+    @staticmethod
+    def _datafinder(tktree, curselection):
+        curID = curselection
+        selname = tktree.item(curID)['text']
+        selname = selname[:selname.find('(') - 1]
+        path = [selname]
+        parentID = tktree.parent(curID)
+
+        while parentID:
+            parentname = tktree.item(parentID)['text']
+            parentname = parentname[:parentname.find('(') - 1]
+            path.insert(0, parentname)
+            curID = parentID
+            parentID = tktree.parent(curID)
+
+        return path
 
     def quit_scras(self):
         pass  # to be implemented

@@ -164,7 +164,6 @@ class SCData:
 
     def reset(self):
         self._datadict.clear()
-        self.operation.clear()
         self._library_sizes = None
 
     def save(self, out_file: str):
