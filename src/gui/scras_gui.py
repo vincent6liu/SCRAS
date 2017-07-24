@@ -135,8 +135,7 @@ class SCRASGui(tk.Tk):
             tk.Entry(numColContainer, textvariable=self.colHeader).grid(column=1, row=0, sticky='W')
 
             tk.Button(self.import_options, text="Compute data statistics",
-                      command=partial(self.showRawDataDistributions, file_type='csv')).grid(column=0, row=5,
-                                                                                            sticky='W', padx=8)
+                      command=partial(self.showRawDataDistributions, file_type='csv')).grid(column=0, row=5, padx=8)
 
             ttk.Separator(self.import_options, orient='horizontal').grid(column=0, row=6, sticky='ew', pady=8)
 
@@ -286,7 +285,6 @@ class SCRASGui(tk.Tk):
             self.mgKaVarEntry.config(state='disabled')
             self.mgEPVar.config(state='disabled')
             self.mgResEntry.config(state='disabled')
-
 
     def load_mtx(self):
         pass  # to be implemented
@@ -461,7 +459,123 @@ class SCRASGui(tk.Tk):
         pass  # to be implemented
 
     def run_dr(self):
-        pass  # to be implemented
+        for key in self.data_list.selection():
+            # pop up for parameters
+            self.drOptions = tk.Toplevel()
+            self.drOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": Dimensionality reduction options")
+            self.curKey = key
+
+            # run PCR or not
+            self.PCAVAR = tk.BooleanVar()
+            self.PCAVAR.set(True)
+            tk.Checkbutton(self.drOptions, text="PCR", command=self._updateDROptions,
+                           variable=self.PCAVAR).grid(column=0, row=0, sticky='w')
+
+            # how many PCR components
+            pCompContainer = tk.Frame(self.drOptions)
+            pCompContainer.grid(column=0, row=1, sticky='w')
+            tk.Label(pCompContainer, text="Number of PCA components:", fg="black", bg="white").grid(column=0,
+                                                                                                    row=0, sticky='w')
+            self.pCompVar = tk.IntVar()
+            self.pCompVar.set(100)
+            self.pCompEntry = tk.Entry(pCompContainer, textvariable=self.pCompVar)
+            self.pCompEntry.grid(column=1, row=0, sticky='w')
+
+            # ranndomized PCR or no
+            self.pRandomVar = tk.BooleanVar()
+            self.pRandomVar.set(True)
+            self.pRandom = tk.Checkbutton(self.drOptions, text="Randomized PCR (faster)", variable=self.pRandomVar)
+            self.pRandom.grid(column=0, row=2, sticky='w')
+
+            # separator
+            ttk.Separator(self.drOptions, orient='horizontal').grid(column=0, row=3, sticky='ew', pady=8)
+
+            # run DM or not
+            self.DMVar = tk.BooleanVar()
+            self.DMVar.set(False)
+            tk.Checkbutton(self.drOptions, text="Diffusion components", command=self._updateDROptions,
+                           variable=self.DMVar).grid(column=0, row=4, sticky='w')
+
+            # how many diffsuion components
+            dCompContainer = tk.Frame(self.drOptions)
+            dCompContainer.grid(column=0, row=5, sticky='w')
+            tk.Label(dCompContainer, text="Number of diffusion components:",
+                     fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.dCompVar = tk.IntVar()
+            self.dCompVar.set(10)
+            self.dCompEntry = tk.Entry(dCompContainer, textvariable=self.dCompVar, state='disabled')
+            self.dCompEntry.grid(column=1, row=0, sticky='w')
+
+            # whats k
+            dKContainer = tk.Frame(self.drOptions)
+            dKContainer.grid(column=0, row=6, sticky='w')
+            tk.Label(dKContainer, text="K:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.dKVar = tk.IntVar()
+            self.dKVar.set(10)
+            self.dKEntry = tk.Entry(dKContainer, textvariable=self.dKVar, state='disabled')
+            self.dKEntry.grid(column=1, row=0, sticky='w')
+
+            # whats ka
+            dKaContainer = tk.Frame(self.drOptions)
+            dKaContainer.grid(column=0, row=7, sticky='w')
+            tk.Label(dKaContainer, text="Ka:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.dKaVar = tk.IntVar()
+            self.dKaVar.set(0)
+            self.dKaEntry = tk.Entry(dKaContainer, textvariable=self.dKaVar, state='disabled')
+            self.dKaEntry.grid(column=1, row=0, sticky='w')
+
+            # whats epsilon
+            dEpContainer = tk.Frame(self.drOptions)
+            dEpContainer.grid(column=0, row=8, sticky='w')
+            tk.Label(dEpContainer, text="Epsilon:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.dEpVar = tk.IntVar()
+            self.dEpVar.set(1)
+            self.dEpEntry = tk.Entry(dEpContainer, textvariable=self.dEpVar, state='disabled')
+            self.dEpEntry.grid(column=1, row=0, sticky='w')
+
+            # which distance metric
+            dDisContainer = tk.Frame(self.drOptions)
+            dDisContainer.grid(column=0, row=9, sticky='w')
+            tk.Label(dDisContainer, text="Distance metric:", fg="black", bg="white").grid(column=0, row=0)
+            self.dDisVar = tk.StringVar()
+            disChoices = {'euclidean', 'manhattan', 'correlation', 'cosine'}
+            self.dDisVar.set('euclidean')
+            self.dDisOption = tk.OptionMenu(dDisContainer, self.dDisVar, *disChoices)
+            self.dDisOption.grid(column=1, row=0)
+            self.dDisOption['state'] = 'disabled'
+
+
+            dButtonContainer = tk.Frame(self.drOptions)
+            dButtonContainer.grid(column=0, row=10, sticky='w')
+            tk.Button(dButtonContainer, text="Cancel", command=self.drOptions.destroy).grid(column=0, row=0)
+            tk.Button(dButtonContainer, text="Run", command=self._runDR).grid(column=1, row=0)
+            self.wait_window(self.drOptions)
+
+    def _updateDROptions(self):
+        if not self.PCAVAR.get():
+            self.pCompEntry.config(state='disabled')
+            self.pRandom.config(state='disabled')
+        else:
+            self.pCompEntry.config(state='normal')
+            self.pRandom.config(state='normal')
+
+        if self.DMVar.get():
+            self.dCompEntry.config(state='normal')
+            self.dKEntry.config(state='normal')
+            self.dKaEntry.config(state='normal')
+            self.dEpEntry.config(state='normal')
+            self.dDisOption.config(state='normal')
+            self.dDisOption['state'] = 'normal'
+        else:
+            self.dCompEntry.config(state='disabled')
+            self.dKEntry.config(state='disabled')
+            self.dKaEntry.config(state='disabled')
+            self.dEpEntry.config(state='disabled')
+            self.dDisOption.config(state='disabled')
+            self.dDisOption['state'] = 'disabled'
+
+    def _runDR(self):
+        pass # to be implemented
 
     def run_clustering(self):
         pass  # to be implemented
