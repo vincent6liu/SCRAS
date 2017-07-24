@@ -461,6 +461,7 @@ class SCData:
         """
         Principal component analysis of the data.
         Note: Column values for the old method are (dataname, PCX) now its just PCX
+        name: source data name:PCA:parameters joined by -:number
         :param n_components: Number of components to project the data
         :param rand: Whether randomized
         """
@@ -470,7 +471,14 @@ class SCData:
         new_data = pd.DataFrame(data=pca.fit_transform(self.data.values), index=self.data.index,
                                 columns=['PC' + str(i) for i in range(1, n_components + 1)])
 
-        key = self.operation.history[0] + ":PCA:" + str(n_components)
+        # assuming each run is different even with the same parameters
+        key_base = self.operation.history[0] + ":PCA:" + str(n_components)
+        count = 0
+        key = key_base + ':' + str(count)
+        while key in self.datadict.keys():
+            count += 1
+            key = key_base + ':' + str(count)
+
         scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
         scdata.operation.add('PCA', str(n_components))
 
@@ -490,9 +498,9 @@ class SCData:
         :param n_diffusion_components: Number of diffusion components to Generalte
         :return: None
         """
-        if self.data_type == 'sc-seq' and 'PCA' not in self.operation.history[-1]:
-            print("must provide pcadata for scRNA sequencing data")
-            return
+        #  if self.data_type == 'sc-seq' and 'PCA' not in self.operation.history[-1]:
+        #     print("must provide pcadata for scRNA sequencing data")
+        #     return
 
         N = self.data.shape[0]
 
@@ -562,8 +570,16 @@ class SCData:
         diffusion_eigenvectors = pd.DataFrame(V, index=self.data.index,
                                               columns=['DC' + str(i) for i in range(n_diffusion_components)])
         diffusion_eigenvalues = pd.DataFrame(D)
+
+        # assuming each run is different even with the same parameters
         par = '-'.join((str(k), str(epsilon), str(distance_metric), str(n_diffusion_components), str(ka)))
-        key = self.operation.history[0] + ":DM:" + par
+        key_base = self.operation.history[0] + ":DM:" + par
+        count = 0
+        key = key_base + ':' + str(count)
+        while key in self.datadict.keys():
+            count += 1
+            key = key_base + ':' + str(count)
+
         scdata = SCData(key, diffusion_eigenvectors, self.data_type, self.metadata, self.operation)
         scdata.operation.add('DM', par)
         self.datadict[key] = scdata

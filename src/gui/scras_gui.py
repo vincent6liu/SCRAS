@@ -575,7 +575,53 @@ class SCRASGui(tk.Tk):
             self.dDisOption['state'] = 'disabled'
 
     def _runDR(self):
-        pass # to be implemented
+        path = self._datafinder(self.data_list, self.curKey)
+        og = self.data[path[0]]
+        scobj = mg.SCData.retrieve_data(og, path)
+
+        if self.PCAVAR.get() and not self.DMVar.get():
+            old_keys = set(scobj.datadict.keys())
+            pcadata = scobj.run_pca(self.pCompVar.get(), self.pRandomVar.get())
+            new_key = old_keys.symmetric_difference(set(scobj.datadict.keys()))
+            new_key = list(new_key)[0]
+
+            # insert the new key to the current tree view under the parent dataset
+            self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(pcadata.data.shape[0]) +
+                                                           ' x ' + str(pcadata.data.shape[1]) + ')', open=True)
+        elif not self.PCAVAR.get() and self.DMVar.get():
+            old_keys = set(scobj.datadict.keys())
+            dmdata = scobj.run_diffusion_map(self.dKVar.get(), self.dEpVar.get(),
+                                             self.dDisVar.get(), self.dCompVar.get(), self.dKaVar.get())
+            new_key = old_keys.symmetric_difference(set(scobj.datadict.keys()))
+            new_key = list(new_key)[0]
+
+            # insert the new key to the current tree view under the parent dataset
+            self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(dmdata.data.shape[0]) +
+                                                           ' x ' + str(dmdata.data.shape[1]) + ')', open=True)
+        elif self.PCAVAR.get() and self.DMVar.get():
+            old_keys = set(scobj.datadict.keys())
+            pcadata = scobj.run_pca(self.pCompVar.get(), self.pRandomVar.get())
+            new_key = old_keys.symmetric_difference(set(scobj.datadict.keys()))
+            new_key = list(new_key)[0]
+
+            # insert the new key to the current tree view under the parent dataset
+            self.curKey = self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(pcadata.data.shape[0]) +
+                                                             ' x ' + str(pcadata.data.shape[1]) + ')', open=True)
+            scobj = scobj.datadict[new_key]
+
+            old_keys = set(scobj.datadict.keys())
+            dmdata = scobj.run_diffusion_map(self.dKVar.get(), self.dEpVar.get(),
+                                             self.dDisVar.get(), self.dCompVar.get(), self.dKaVar.get())
+            new_key = old_keys.symmetric_difference(set(scobj.datadict.keys()))
+            new_key = list(new_key)[0]
+
+            # insert the new key to the current tree view under the parent dataset
+            self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(dmdata.data.shape[0]) +
+                                                           ' x ' + str(dmdata.data.shape[1]) + ')', open=True)
+        else:
+            pass  # do nothing
+
+        self.drOptions.destroy()
 
     def run_clustering(self):
         pass  # to be implemented
