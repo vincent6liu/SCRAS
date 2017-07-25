@@ -117,7 +117,8 @@ class SCRASGui(tk.Tk):
 
             skipSelectionContainer = tk.Frame(self.import_options)
             skipSelectionContainer.grid(column=0, row=4, sticky='w')
-            tk.Label(skipSelectionContainer, text="Number of additional rows/columns to skip after gene/cell names").grid(
+            tk.Label(skipSelectionContainer,
+                     text="Number of additional rows/columns to skip after gene/cell names").grid(
                 column=0, row=0, columnspan=3, sticky='W')
 
             numRowContainer = tk.Frame(skipSelectionContainer)
@@ -257,7 +258,8 @@ class SCRASGui(tk.Tk):
 
             finalButtonContainer = tk.Frame(self.import_options)
             finalButtonContainer.grid(column=0, row=21)
-            tk.Button(finalButtonContainer, text="Cancel", command=self.import_options.destroy).grid(column=0, row=0, padx=20)
+            tk.Button(finalButtonContainer, text="Cancel", command=self.import_options.destroy).grid(column=0, row=0,
+                                                                                                     padx=20)
             tk.Button(finalButtonContainer, text="Load",
                       command=partial(self.process_data, file_type='csv')).grid(column=1, row=0, padx=20)
 
@@ -352,7 +354,7 @@ class SCRASGui(tk.Tk):
         if file_type != 'pickle':
             # filter the data
             if len(self.filterCellMinVar.get()) > 0 or len(self.filterCellMaxVar.get()) > 0 or \
-               len(self.filterGeneNonzeroVar.get()) > 0 or len(self.filterGeneMolsVar.get()) > 0:
+                            len(self.filterGeneNonzeroVar.get()) > 0 or len(self.filterGeneMolsVar.get()) > 0:
                 scdata.filter_scseq_data(
                     filter_cell_min=int(self.filterCellMinVar.get()) if len(self.filterCellMinVar.get()) > 0 else 0,
                     filter_cell_max=int(self.filterCellMaxVar.get()) if len(self.filterCellMaxVar.get()) > 0 else 0,
@@ -375,8 +377,8 @@ class SCRASGui(tk.Tk):
 
         self.data[self.fileNameEntryVar.get()] = scdata
         self.data_list.insert('', 'end', text=self.fileNameEntryVar.get() +
-                                         ' (' + str(scdata.data.shape[0]) +
-                                         ' x ' + str(scdata.data.shape[1]) + ')', open=True)
+                                              ' (' + str(scdata.data.shape[0]) +
+                                              ' x ' + str(scdata.data.shape[1]) + ')', open=True)
 
         # enable buttons
         self.fileMenu.entryconfig(5, state='normal')
@@ -462,6 +464,7 @@ class SCRASGui(tk.Tk):
         for key in self.data_list.selection():
             # pop up for parameters
             self.drOptions = tk.Toplevel()
+            self.drOptions.resizable(False, False)
             self.drOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": Dimensionality reduction options")
             self.curKey = key
 
@@ -544,11 +547,10 @@ class SCRASGui(tk.Tk):
             self.dDisOption.grid(column=1, row=0)
             self.dDisOption['state'] = 'disabled'
 
-
             dButtonContainer = tk.Frame(self.drOptions)
             dButtonContainer.grid(column=0, row=10, sticky='w')
             tk.Button(dButtonContainer, text="Cancel", command=self.drOptions.destroy).grid(column=0, row=0)
-            tk.Button(dButtonContainer, text="Run", command=self._runDR).grid(column=1, row=0)
+            tk.Button(dButtonContainer, text="Run", command=self._run_dr).grid(column=1, row=0)
             self.wait_window(self.drOptions)
 
     def _updateDROptions(self):
@@ -574,7 +576,7 @@ class SCRASGui(tk.Tk):
             self.dDisOption.config(state='disabled')
             self.dDisOption['state'] = 'disabled'
 
-    def _runDR(self):
+    def _run_dr(self):
         path = self._datafinder(self.data_list, self.curKey)
         og = self.data[path[0]]
         scobj = mg.SCData.retrieve_data(og, path)
@@ -606,7 +608,8 @@ class SCRASGui(tk.Tk):
 
             # insert the new key to the current tree view under the parent dataset
             self.curKey = self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(pcadata.data.shape[0]) +
-                                                             ' x ' + str(pcadata.data.shape[1]) + ')', open=True)
+                                                                         ' x ' + str(pcadata.data.shape[1]) + ')',
+                                                open=True)
             scobj = scobj.datadict[new_key]
 
             old_keys = set(scobj.datadict.keys())
@@ -633,6 +636,7 @@ class SCRASGui(tk.Tk):
         for key in self.data_list.selection():
             # pop up for parameters
             self.tsneOptions = tk.Toplevel()
+            self.tsneOptions.resizable(False, False)
             self.tsneOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": tSNE plotting options")
             self.curKey = key
 
@@ -713,7 +717,95 @@ class SCRASGui(tk.Tk):
         self.tsneOptions.destroy()
 
     def scatter_plot(self):
-        pass  # to be implemented
+        for key in self.data_list.selection():
+            # pop up for parameters
+            self.scatterOptions = tk.Toplevel()
+            self.scatterOptions.resizable(False, False)
+            self.scatterOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": scatter plotting options")
+            self.curKey = key
+
+            # what is x
+            sXContainer = tk.Frame(self.scatterOptions)
+            sXContainer.grid(column=0, row=0, sticky='w')
+            tk.Label(sXContainer, text="X:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.sXVar = tk.StringVar()
+            self.sXVar.set('')
+            self.sXEntry = tk.Entry(sXContainer, textvariable=self.sXVar)
+            self.sXEntry.grid(column=1, row=0, sticky='w')
+
+            # what is y
+            sYContainer = tk.Frame(self.scatterOptions)
+            sYContainer.grid(column=0, row=1, sticky='w')
+            tk.Label(sYContainer, text="Y:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.sYVar = tk.StringVar()
+            self.sYVar.set('')
+            self.sYEntry = tk.Entry(sYContainer, textvariable=self.sYVar)
+            self.sYEntry.grid(column=1, row=0, sticky='w')
+
+            # what is z
+            sZContainer = tk.Frame(self.scatterOptions)
+            sZContainer.grid(column=0, row=2, sticky='w')
+            tk.Label(sZContainer, text="Z:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.sZVar = tk.StringVar()
+            self.sZVar.set('')
+            self.sZEntry = tk.Entry(sZContainer, textvariable=self.sZVar)
+            self.sZEntry.grid(column=1, row=0, sticky='w')
+
+            # color of plot
+            sColorContainer = tk.Frame(self.scatterOptions)
+            sColorContainer.grid(column=0, row=3, sticky='w')
+            tk.Label(sColorContainer, text="Color:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.sColorVar = tk.StringVar()
+            self.sColorVar.set('blue')
+            self.sColorEntry = tk.Entry(sColorContainer, textvariable=self.sColorVar)
+            self.sColorEntry.grid(column=1, row=0, sticky='w')
+
+            sButtonContainer = tk.Frame(self.scatterOptions)
+            sButtonContainer.grid(column=0, row=10)
+            tk.Button(sButtonContainer, text="Cancel", command=self.scatterOptions.destroy).grid(column=0, row=0)
+            tk.Button(sButtonContainer, text="Run", command=self._scatter_plot).grid(column=1, row=0)
+            self.wait_window(self.scatterOptions)
+
+    def _scatter_plot(self):
+        path = self._datafinder(self.data_list, self.curKey)
+        og = self.data[path[0]]
+        scobj = mg.SCData.retrieve_data(og, path)
+
+        # plot figure setup
+        self.fig = plt.figure(figsize=[6, 6])
+        gs = gridspec.GridSpec(1, 1)
+        if self.sZVar.get() != '':  # 3D graph
+            self.ax = self.fig.add_subplot(gs[0, 0], projection='3d')
+            toplot = (self.sXVar.get(), self.sYVar.get(), self.sZVar.get())
+        else:
+            self.ax = self.fig.add_subplot(gs[0, 0])
+            toplot = (self.sXVar.get(), self.sYVar.get())
+        color = self.sColorVar.get()
+
+        scobj.scatter_gene_expression(toplot, color=self.sColorVar.get(), fig=self.fig, ax=self.ax)
+        self.ax.set_title(scobj.name + ' (color =' + color + ')')
+        self.ax.set_xlabel(toplot[0])
+        self.ax.set_ylabel(toplot[1])
+        if len(toplot) == 3:
+            self.ax.set_zlabel(toplot[2])
+
+        gs.tight_layout(self.fig)
+
+        self.tabs.append([tk.Frame(self.notebook), self.fig])
+        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text="Scatter")
+
+        self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
+        self.canvas.show()
+        self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
+
+        self.fileMenu.entryconfig(5, state='normal')
+
+        self.currentPlot = 'scatter'
+
+        if self.sZVar.get() != '':
+            self.ax.mouse_init()
+
+        self.scatterOptions.destroy()
 
     @staticmethod
     def _keygen(name: str, op: str, params: list):
