@@ -600,9 +600,13 @@ class SCData:
 
         # Reduce perplexity if necessary
         perplexity_limit = 15
+
         if self.data.shape[0] < 100 and perplexity > perplexity_limit:
             print('Reducing perplexity to %d since there are <100 cells in the dataset. ' % perplexity_limit)
-        tsne = TSNE(n_components=2, perplexity=perplexity, init='random', random_state=sum(self.data.shape),
+            perp = perplexity_limit
+        else:
+            perp = perplexity
+        tsne = TSNE(n_components=2, perplexity=perp, init='random', random_state=sum(self.data.shape),
                     n_iter=n_iter, angle=float(theta))
 
         tsne_data = pd.DataFrame(tsne.fit_transform(self.data), index=self.data.index, columns=['tSNE1', 'tSNE2'])

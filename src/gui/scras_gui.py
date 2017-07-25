@@ -630,7 +630,87 @@ class SCRASGui(tk.Tk):
         pass  # to be implemented
 
     def tsne(self):
-        pass  # to be implemented
+        for key in self.data_list.selection():
+            # pop up for parameters
+            self.tsneOptions = tk.Toplevel()
+            self.tsneOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": tSNE plotting options")
+            self.curKey = key
+
+            # what is the perplexity
+            tPerpContainer = tk.Frame(self.tsneOptions)
+            tPerpContainer.grid(column=0, row=0, sticky='w')
+            tk.Label(tPerpContainer, text="Perplexity:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.tPerpVar = tk.IntVar()
+            self.tPerpVar.set(30)
+            self.tPerpEntry = tk.Entry(tPerpContainer, textvariable=self.tPerpVar)
+            self.tPerpEntry.grid(column=1, row=0, sticky='w')
+
+            # number of iterations
+            tIterContainer = tk.Frame(self.tsneOptions)
+            tIterContainer.grid(column=0, row=1, sticky='w')
+            tk.Label(tIterContainer, text="Number of iterations:", fg="black",
+                     bg="white").grid(column=0, row=0, sticky='w')
+            self.tIterVar = tk.IntVar()
+            self.tIterVar.set(1000)
+            self.tIterEntry = tk.Entry(tIterContainer, textvariable=self.tIterVar)
+            self.tIterEntry.grid(column=1, row=0, sticky='w')
+
+            # value of theta
+            tThetaContainer = tk.Frame(self.tsneOptions)
+            tThetaContainer.grid(column=0, row=2, sticky='w')
+            tk.Label(tThetaContainer, text="Theta:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.tThetaVar = tk.DoubleVar()
+            self.tThetaVar.set(0.5)
+            self.tThetaEntry = tk.Entry(tThetaContainer, textvariable=self.tThetaVar)
+            self.tThetaEntry.grid(column=1, row=0, sticky='w')
+
+            # color of plot
+            tColorContainer = tk.Frame(self.tsneOptions)
+            tColorContainer.grid(column=0, row=3, sticky='w')
+            tk.Label(tColorContainer, text="Color:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.tColorVar = tk.StringVar()
+            self.tColorVar.set('blue')
+            self.tColorEntry = tk.Entry(tColorContainer, textvariable=self.tColorVar)
+            self.tColorEntry.grid(column=1, row=0, sticky='w')
+
+            tButtonContainer = tk.Frame(self.tsneOptions)
+            tButtonContainer.grid(column=0, row=10, sticky='w')
+            tk.Button(tButtonContainer, text="Cancel", command=self.tsneOptions.destroy).grid(column=0, row=0)
+            tk.Button(tButtonContainer, text="Run", command=self._tsne).grid(column=1, row=0)
+            self.wait_window(self.tsneOptions)
+
+    def _tsne(self):
+        path = self._datafinder(self.data_list, self.curKey)
+        og = self.data[path[0]]
+        scobj = mg.SCData.retrieve_data(og, path)
+
+        tsnedata = scobj.run_tsne(self.tPerpVar.get(), self.tIterVar.get(), self.tThetaVar.get())
+
+        # plot figure setup
+        self.fig = plt.figure(figsize=[6, 6])
+        gs = gridspec.GridSpec(1, 1)
+        self.ax = self.fig.add_subplot(gs[0, 0])
+        color = self.tColorVar.get()
+
+        mg.SCData.plot_tsne(tsnedata, self.fig, self.ax, color=color)
+        self.ax.set_title(scobj.name + ' (color =' + color + ')')
+        self.ax.set_xlabel('tSNE1')
+        self.ax.set_ylabel('tSNE2')
+
+        gs.tight_layout(self.fig)
+
+        self.tabs.append([tk.Frame(self.notebook), self.fig])
+        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text="tSNE")
+
+        self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
+        self.canvas.show()
+        self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
+
+        self.fileMenu.entryconfig(5, state='normal')
+
+        self.currentPlot = 'tsne'
+
+        self.tsneOptions.destroy()
 
     def scatter_plot(self):
         pass  # to be implemented
