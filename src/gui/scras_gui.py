@@ -627,6 +627,96 @@ class SCRASGui(tk.Tk):
         self.drOptions.destroy()
 
     def run_clustering(self):
+        for key in self.data_list.selection():
+            # pop up for parameters
+            self.clusterOptions = tk.Toplevel()
+            self.clusterOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": Clustering options")
+            self.curKey = key
+
+            tk.Label(self.clusterOptions, text="Phenograph options:", fg="black", bg="white").grid(column=0, row=0)
+
+            # whats the number of nearest neighbors
+            cKContainer = tk.Frame(self.clusterOptions)
+            cKContainer.grid(column=0, row=1, sticky='w')
+            tk.Label(cKContainer, text="Number of nearest neighbors:", fg="black", bg="white").grid(column=0,
+                                                                                                    row=0, sticky='w')
+            self.cKVar = tk.IntVar()
+            self.cKVar.set(30)
+            tk.Entry(cKContainer, textvariable=self.cKVar).grid(column=1, row=0, sticky='w')
+
+            # whats the minimum cluster size
+            cMinContainer = tk.Frame(self.clusterOptions)
+            cMinContainer.grid(column=0, row=2, sticky='w')
+            tk.Label(cMinContainer, text="Minimum cluster size:", fg="black", bg="white").grid(column=0,
+                                                                                               row=0, sticky='w')
+            self.cMinVar = tk.IntVar()
+            self.cMinVar.set(10)
+            tk.Entry(cMinContainer, textvariable=self.cMinVar).grid(column=1, row=0, sticky='w')
+
+            # whats the distance metric
+            cMinContainer = tk.Frame(self.clusterOptions)
+            cMinContainer.grid(column=0, row=3, sticky='w')
+            tk.Label(cMinContainer, text="Distance metric:", fg="black", bg="white").grid(column=0,
+                                                                                                row=0, sticky='w')
+            self.cChoiceVar = tk.StringVar()
+            choices = {'euclidean', 'manhattan', 'correlation', 'cosine'}
+            self.cChoiceVar.set('euclidean')
+            tk.OptionMenu(cMinContainer, self.cChoiceVar, *choices).grid(column=1, row=0, sticky='w')
+
+            # whats the number of jobs
+            cNjobContainer = tk.Frame(self.clusterOptions)
+            cNjobContainer.grid(column=0, row=4, sticky='w')
+            tk.Label(cNjobContainer, text="Number of jobs:", fg="black", bg="white").grid(column=0,
+                                                                                          row=0, sticky='w')
+            self.cNjobVar = tk.IntVar()
+            self.cNjobVar.set(-1)
+            tk.Entry(cNjobContainer, textvariable=self.cNjobVar).grid(column=1, row=0, sticky='w')
+
+            # whats the tolerance
+            cToleContainer = tk.Frame(self.clusterOptions)
+            cToleContainer.grid(column=0, row=5, sticky='w')
+            tk.Label(cToleContainer, text="Tolerance:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.cToleVar = tk.DoubleVar()
+            self.cToleVar.set(1e-3)
+            tk.Entry(cToleContainer, textvariable=self.cToleVar).grid(column=1, row=0, sticky='w')
+
+            # whats the Louvain time limit
+            cLouvContainer = tk.Frame(self.clusterOptions)
+            cLouvContainer.grid(column=0, row=6, sticky='w')
+            tk.Label(cLouvContainer, text="Louvain time limit (s):", fg="black", bg="white").grid(column=0,
+                                                                                                  row=0, sticky='w')
+            self.cLouvVar = tk.IntVar()
+            self.cLouvVar.set(2000)
+            tk.Entry(cLouvContainer, textvariable=self.cLouvVar).grid(column=1, row=0, sticky='w')
+
+            # whats the nn-method
+            cNNContainer = tk.Frame(self.clusterOptions)
+            cNNContainer.grid(column=0, row=7, sticky='w')
+            tk.Label(cNNContainer, text="nn-method:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.cNNVar = tk.StringVar()
+            nn_choices = {'brute force', 'kdtree'}
+            self.cNNVar.set('kdtree')
+            tk.OptionMenu(cNNContainer, self.cNNVar, *nn_choices).grid(column=1, row=0, sticky='w')
+
+            cCheckContainer = tk.Frame(self.clusterOptions)
+            cCheckContainer.grid(column=0, row=8)
+            self.cPruneVar = tk.BooleanVar()
+            self.cPruneVar.set(False)
+            tk.Checkbutton(cCheckContainer, text="Prune", variable=self.cPruneVar).grid(column=0, row=0)
+            self.cDirectedVar = tk.BooleanVar()
+            self.cDirectedVar.set(False)
+            tk.Checkbutton(cCheckContainer, text="Directed Graph", variable=self.cDirectedVar).grid(column=1, row=0)
+            self.cJaccVar = tk.BooleanVar()
+            self.cJaccVar.set(True)
+            tk.Checkbutton(cCheckContainer, text="Jaccard Metric", variable=self.cJaccVar).grid(column=2, row=0)
+
+            cButtonContainer = tk.Frame(self.clusterOptions)
+            cButtonContainer.grid(column=0, row=9)
+            tk.Button(cButtonContainer, text="Cancel", command=self.clusterOptions.destroy).grid(column=0, row=0)
+            tk.Button(cButtonContainer, text="Run", command=self._run_clustering).grid(column=1, row=0)
+            self.wait_window(self.clusterOptions)
+
+    def _run_clustering(self):
         pass  # to be implemented
 
     def run_gea(self):

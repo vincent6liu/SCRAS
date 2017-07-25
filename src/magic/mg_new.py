@@ -586,6 +586,18 @@ class SCData:
 
         return scdata
 
+    def run_phenograph(self, k=30, directed=False, prune=False, min_cluster_size=10, jaccard=True,
+                       dis_metric='euclidean', n_jobs=-1, q_tol=1e-3, louvain_time_limit=2000, nn_method='kdtree'):
+        communities, graph, Q = phenograph.cluster(self.data, k=k,
+                                                   directed=directed, prune=prune,
+                                                   min_cluster_size=min_cluster_size, jaccard=jaccard,
+                                                   primary_metric=dis_metric, n_jobs=n_jobs,
+                                                   q_tol=q_tol, louvain_time_limit=louvain_time_limit,
+                                                   nn_method=nn_method)
+        self.cluster = ClusterInfo(communities, graph, Q, 'phenograph')
+
+        return communities
+
     # note now this only returns a pd.Dataframe object
     def run_tsne(self, perplexity=30, n_iter=1000, theta=0.5):
         """ Run tSNE on the data. tSNE is run on the principal component projections
@@ -708,6 +720,12 @@ class SCData:
         ax.set_title(title)
         plt.axis('tight')
         plt.tight_layout()
+        return fig, ax
+
+    def plot_phenograph(self, communities, fig=None, ax=None, density=False, title='PhenoGraph Clustering'):
+        tsne = self.run_tsne()
+        self.plot_tsne(tsne, fig=fig, ax=ax, density=density, color=communities, title=title)
+
         return fig, ax
 
     def scatter_gene_expression(self, genes, density=False, color=None, fig=None, ax=None):
