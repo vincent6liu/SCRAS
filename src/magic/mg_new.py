@@ -262,6 +262,11 @@ class SCData:
         df.drop(df.index[1:rows_after_header_to_skip + 1], axis=0, inplace=True)
         df.drop(df.columns[1:cols_after_header_to_skip + 1], axis=1, inplace=True)
 
+        # filter out genes with 0 read
+        sums = df.sum(axis=0)
+        to_keep = np.where(sums > 0)[0]
+        df = df.iloc[:, to_keep]
+
         if cell_axis != 0:
             df = df.transpose()
 
@@ -637,7 +642,7 @@ class SCData:
             rowsum = np.log10(self.data.sum(axis=1))
             for i in range(3):
                 ax = plt.subplot(gs[0, i])
-                if not i:
+                if i == 0:
                     print(np.min(rowsum))
                     print(np.max(rowsum))
                     ax.hist(rowsum, bins='auto')

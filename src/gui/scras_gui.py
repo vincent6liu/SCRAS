@@ -297,8 +297,27 @@ class SCRASGui(tk.Tk):
     def load_pickle(self):
         pass  # to be implemented
 
-    def showRawDataDistributions(self):
-        pass  # to be implemented
+    def showRawDataDistributions(self, file_type='csv'):
+        if file_type == 'csv':  # sc-seq data
+            scdata = mg.SCData.from_csv(os.path.expanduser(self.filename), data_name='preprocess', data_type='sc-seq')
+        elif file_type == 'mtx':  # sparse matrix
+            scdata = mg.SCData.from_mtx(os.path.expanduser(self.dataFileName),
+                                        os.path.expanduser(self.geneNameFile))
+        elif file_type == '10x':
+            scdata = mg.SCData.from_10x(self.dataDir)
+
+        self.dataDistributions = tk.Toplevel()
+        self.dataDistributions.title(self.fileNameEntryVar.get() + ": raw data distributions")
+
+        fig, ax = scdata.plot_molecules_per_cell_and_gene()
+        fig.tight_layout()
+
+        canvas = FigureCanvasTkAgg(fig, self.dataDistributions)
+        canvas.show()
+        canvas.get_tk_widget().grid(column=0, row=0, rowspan=10, columnspan=4, sticky='NSEW')
+        del scdata
+
+        self.wait_window(self.dataDistributions)
 
     def process_data(self, file_type='csv'):
 
