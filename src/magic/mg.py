@@ -197,12 +197,6 @@ class SCData:
     def logtrans(self):
         return self._logtrans
 
-    @logtrans.setter
-    def logtrans(self, boolean):
-        if not isinstance(boolean, bool):
-            raise TypeError('must be a boolean value')
-        self._logtrans = boolean
-
     @property
     def pca(self):
         if self._pca != None:
@@ -1151,3 +1145,6 @@ class SCData:
 
         scdata = magic.mg.SCData(df_concat)
         return scdata
+
+newSC = SCData.from_csv("/Users/vincentliu/Desktop/Pe'er Lab/Summer 2017/Data/pbmc_4k_short.csv", "Data0")
+print(newSC)

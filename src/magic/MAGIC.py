@@ -9,11 +9,11 @@ from sklearn.neighbors import NearestNeighbors
 
 def magic(data, pca_data=None, t=6, k=30, ka=10, epsilon=1, rescale=99):
 
-    if pca_data == None:
+    if pca_data is None:
         pca_data = data
 
     #run diffusion maps to get markov matrix
-    L = compute_markov(pca_projected_data, k=k, epsilon=epsilon, 
+    L = compute_markov(pca_data, k=k, epsilon=epsilon,
                        distance_metric='euclidean', ka=ka)
 
     #remove tsne kernel for now
