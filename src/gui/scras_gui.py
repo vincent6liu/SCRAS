@@ -698,6 +698,7 @@ class SCRASGui(tk.Tk):
             self.cNNVar.set('kdtree')
             tk.OptionMenu(cNNContainer, self.cNNVar, *nn_choices).grid(column=1, row=0, sticky='w')
 
+            # some yes or no questions
             cCheckContainer = tk.Frame(self.clusterOptions)
             cCheckContainer.grid(column=0, row=8)
             self.cPruneVar = tk.BooleanVar()
@@ -717,7 +718,95 @@ class SCRASGui(tk.Tk):
             self.wait_window(self.clusterOptions)
 
     def _run_clustering(self):
-        pass  # to be implemented
+        self.clusterOptions.destroy()
+
+        path = self._datafinder(self.data_list, self.curKey)
+        og = self.data[path[0]]
+        scobj = mg.SCData.retrieve_data(og, path)
+
+        self.phenoProgress = tk.Toplevel()
+        self.msgVar = tk.StringVar()
+        self.msgVar.set("starting PhenoGraph...")
+        self.phenoProgress.title(scobj.name + ': running PhenoGraph')
+        self.msgLb = tk.Label(self.phenoProgress, textvariable=self.msgVar).pack()
+
+        self.phenoProgress.update()
+
+        # run tsne with default setting
+        tsnedata = scobj.run_tsne()
+
+        self.msgVar.set("running PhenoGraph...")
+        self.phenoProgress.update()
+        communities, Q = scobj.run_phenograph(k=self.cKVar.get(), directed=self.cDirectedVar.get(),
+                                        prune=self.cPruneVar.get(), min_cluster_size=self.cMinVar.get(),
+                                        jaccard=self.cJaccVar.get(), dis_metric=self.cChoiceVar.get(),
+                                        n_jobs=self.cNjobVar.get(), q_tol=self.cToleVar.get(),
+                                        louvain_time_limit=self.cLouvVar.get(), nn_method=self.cNNVar.get())
+        color = pd.Series(communities)
+
+        # plot figure setup
+        toPlot = tsnedata.assign(com=pd.Series(color).values)
+        clusterRec = {}
+        self.fig = plt.figure(figsize=[6, 6])
+        gs = gridspec.GridSpec(1, 1)
+        self.ax = self.fig.add_subplot(gs[0, 0])
+
+        # plot tsne using communities to label color
+        self.msgVar.set("plotting data points...")
+        self.phenoProgress.update()
+
+        mg.SCData.plot_tsne(tsnedata, self.fig, self.ax, color=color)
+        self.ax.set_title(scobj.name)
+        self.ax.set_xlabel('tSNE1')
+        self.ax.set_ylabel('tSNE2')
+
+        # position cluster number at cluster center
+        for index, row in toPlot.iterrows():
+            if row['com'] in clusterRec:
+                count = clusterRec[row['com']][2]
+                new1 = (clusterRec[row['com']][0] * count + row['tSNE1']) / (count + 1)
+                new2 = (clusterRec[row['com']][1] * count + row['tSNE2']) / (count + 1)
+                clusterRec[row['com']] = [new1, new2, count + 1]
+            else:
+                clusterRec[row['com']] = [row['tSNE1'], row['tSNE2'], 1]
+
+        for key in clusterRec:
+            x, y = clusterRec[key][0], clusterRec[key][1]
+            self.ax.annotate(str(int(key)), (x, y), fontsize=20, weight='bold', color='#777777')
+
+        # add figure to the GUI
+        gs.tight_layout(self.fig)
+
+        self.tabs.append([tk.Frame(self.notebook), self.fig])
+        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text="PhenoGraph")
+
+        self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
+        self.canvas.show()
+        self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
+
+        # enable plot saving
+        self.fileMenu.entryconfig(6, state='normal')
+
+        self.currentPlot = 'phenograph'
+        self.phenoProgress.destroy()
+
+        numCluster = np.max(communities) + 1
+        communities = [int(i) for i in communities]
+        diff = 1 - min(communities)
+        communities = [str(i + diff) for i in communities]
+
+        self.phenoResult = tk.Toplevel()
+        self.phenoResult.title(scobj.name + " PhenoGraph Results")
+        tk.Label(self.phenoResult, text="Number of clusters: " + str(numCluster),
+                 fg="black", bg="white").grid(column=0, row=1, sticky='w')
+        tk.Label(self.phenoResult, text="Modularity score: " + str(Q), fg="black", bg="white").grid(column=0,
+                                                                                                    row=2, sticky='w')
+        tk.Button(self.phenoResult, text="Ok", command=self.phenoResult.destroy).grid(column=0, row=3)
+        tk.Button(self.phenoResult, text="Save communities as CSV",
+                  command=lambda: self.saveCSV(scobj, pd.Series(communities))).grid(column=1, row=3)
+        self.phenoResult.update()
+        self.wait_window(self.phenoResult)
+
 
     def run_gea(self):
         pass  # to be implemented
@@ -800,7 +889,7 @@ class SCRASGui(tk.Tk):
         self.canvas.show()
         self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
-        self.fileMenu.entryconfig(5, state='normal')
+        self.fileMenu.entryconfig(6, state='normal')
 
         self.currentPlot = 'tsne'
 
@@ -896,6 +985,33 @@ class SCRASGui(tk.Tk):
             self.ax.mouse_init()
 
         self.scatterOptions.destroy()
+
+    def saveCSV(self, scdata, col):
+        self.phenoResult.destroy()
+
+        toSave = scdata.data.assign(com=pd.Series(col).values)
+        csvFile = filedialog.asksaveasfile(title='Save as CSV', defaultextension='.csv', mode='w')
+
+        if csvFile:
+            clusters = []
+            cell_map = {}
+            for index, row in toSave.iterrows():
+                if row['com'] in clusters:
+                    cell_map[row['com']].append(index)
+                else:
+                    clusters.append(row['com'])
+                    cell_map[row['com']] = [index]
+
+            clusters = sorted(clusters)
+        else:
+            return
+
+        writer = csv.writer(csvFile, delimiter=',')
+        writer.writerow(clusters)
+        for clus in clusters:
+            writer.writerow(cell_map[clus])
+
+        csvFile.close()
 
     @staticmethod
     def _keygen(name: str, op: str, params: list):

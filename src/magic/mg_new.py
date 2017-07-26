@@ -237,8 +237,6 @@ class SCData:
 
     @cluster.setter
     def cluster(self, cluobj):
-        if type(cluobj) is not type(ClusterInfo):
-            raise TypeError("cluster must be a ClusterInfo object")
         self._clusterinfo = cluobj
 
     @property
@@ -594,9 +592,10 @@ class SCData:
                                                    primary_metric=dis_metric, n_jobs=n_jobs,
                                                    q_tol=q_tol, louvain_time_limit=louvain_time_limit,
                                                    nn_method=nn_method)
+        communities = np.add(communities, 1)
         self.cluster = ClusterInfo(communities, graph, Q, 'phenograph')
 
-        return communities
+        return communities, Q
 
     # note now this only returns a pd.Dataframe object
     def run_tsne(self, perplexity=30, n_iter=1000, theta=0.5):
@@ -720,12 +719,6 @@ class SCData:
         ax.set_title(title)
         plt.axis('tight')
         plt.tight_layout()
-        return fig, ax
-
-    def plot_phenograph(self, communities, fig=None, ax=None, density=False, title='PhenoGraph Clustering'):
-        tsne = self.run_tsne()
-        self.plot_tsne(tsne, fig=fig, ax=ax, density=density, color=communities, title=title)
-
         return fig, ax
 
     def scatter_gene_expression(self, genes, density=False, color=None, fig=None, ax=None):
