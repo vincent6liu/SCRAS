@@ -468,13 +468,13 @@ class SCRASGui(tk.Tk):
             self.drOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": Dimensionality reduction options")
             self.curKey = key
 
-            # run PCR or not
+            # run PCA or not
             self.PCAVAR = tk.BooleanVar()
             self.PCAVAR.set(True)
-            tk.Checkbutton(self.drOptions, text="PCR", command=self._updateDROptions,
+            tk.Checkbutton(self.drOptions, text="PCA", command=self._updateDROptions,
                            variable=self.PCAVAR).grid(column=0, row=0, sticky='w')
 
-            # how many PCR components
+            # how many PCA components
             pCompContainer = tk.Frame(self.drOptions)
             pCompContainer.grid(column=0, row=1, sticky='w')
             tk.Label(pCompContainer, text="Number of PCA components:", fg="black", bg="white").grid(column=0,
@@ -484,10 +484,10 @@ class SCRASGui(tk.Tk):
             self.pCompEntry = tk.Entry(pCompContainer, textvariable=self.pCompVar)
             self.pCompEntry.grid(column=1, row=0, sticky='w')
 
-            # ranndomized PCR or no
+            # ranndomized PCA or no
             self.pRandomVar = tk.BooleanVar()
             self.pRandomVar.set(True)
-            self.pRandom = tk.Checkbutton(self.drOptions, text="Randomized PCR (faster)", variable=self.pRandomVar)
+            self.pRandom = tk.Checkbutton(self.drOptions, text="Randomized PCA (faster)", variable=self.pRandomVar)
             self.pRandom.grid(column=0, row=2, sticky='w')
 
             # separator
@@ -590,6 +590,30 @@ class SCRASGui(tk.Tk):
             # insert the new key to the current tree view under the parent dataset
             self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(pcadata.data.shape[0]) +
                                                            ' x ' + str(pcadata.data.shape[1]) + ')', open=True)
+
+            # plot figure setup
+            self.fig = plt.figure(figsize=[6, 6])
+            gs = gridspec.GridSpec(1, 1)
+            self.ax = self.fig.add_subplot(gs[0, 0])
+            pcadata.plot_pca_variance_explained(self.pCompVar.get(), self.fig, self.ax, random=self.pRandomVar.get())
+
+            self.ax.set_title(pcadata.name + 'Variance')
+            self.ax.set_xlabel('PCA Components')
+            self.ax.set_ylabel('Percent Total Variance')
+
+            gs.tight_layout(self.fig)
+
+            self.tabs.append([tk.Frame(self.notebook), self.fig])
+            self.notebook.add(self.tabs[len(self.tabs) - 1][0], text="PCA")
+
+            self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
+            self.canvas.show()
+            self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
+
+            self.fileMenu.entryconfig(6, state='normal')
+
+            self.currentPlot = 'pcavariance'
+
         elif not self.PCAVAR.get() and self.DMVar.get():
             old_keys = set(scobj.datadict.keys())
             dmdata = scobj.run_diffusion_map(self.dKVar.get(), self.dEpVar.get(),
@@ -601,6 +625,7 @@ class SCRASGui(tk.Tk):
             self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(dmdata.data.shape[0]) +
                                                            ' x ' + str(dmdata.data.shape[1]) + ')', open=True)
         elif self.PCAVAR.get() and self.DMVar.get():
+            # run PCA first
             old_keys = set(scobj.datadict.keys())
             pcadata = scobj.run_pca(self.pCompVar.get(), self.pRandomVar.get())
             new_key = old_keys.symmetric_difference(set(scobj.datadict.keys()))
@@ -610,6 +635,30 @@ class SCRASGui(tk.Tk):
             self.curKey = self.data_list.insert(self.curKey, 'end', text=new_key + ' (' + str(pcadata.data.shape[0]) +
                                                                          ' x ' + str(pcadata.data.shape[1]) + ')',
                                                 open=True)
+            # plot PCA variance
+            self.fig = plt.figure(figsize=[6, 6])
+            gs = gridspec.GridSpec(1, 1)
+            self.ax = self.fig.add_subplot(gs[0, 0])
+            pcadata.plot_pca_variance_explained(self.pCompVar.get(), self.fig, self.ax, random=self.pRandomVar.get())
+
+            self.ax.set_title(pcadata.name + 'Variance')
+            self.ax.set_xlabel('PCA Components')
+            self.ax.set_ylabel('Percent Total Variance')
+
+            gs.tight_layout(self.fig)
+
+            self.tabs.append([tk.Frame(self.notebook), self.fig])
+            self.notebook.add(self.tabs[len(self.tabs) - 1][0], text="PCA")
+
+            self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
+            self.canvas.show()
+            self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
+
+            self.fileMenu.entryconfig(6, state='normal')
+
+            self.currentPlot = 'pcavariance'
+
+            # then run DM
             scobj = scobj.datadict[new_key]
 
             old_keys = set(scobj.datadict.keys())
@@ -806,7 +855,6 @@ class SCRASGui(tk.Tk):
                   command=lambda: self.saveCSV(scobj, pd.Series(communities))).grid(column=1, row=3)
         self.phenoResult.update()
         self.wait_window(self.phenoResult)
-
 
     def run_gea(self):
         pass  # to be implemented

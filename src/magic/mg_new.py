@@ -619,7 +619,7 @@ class SCData:
             perp = perplexity
         tsne = TSNE(n_components=2, perplexity=perp, init='random', random_state=sum(self.data.shape),
                     n_iter=n_iter, angle=float(theta))
-
+        print(self.data)
         tsne_data = pd.DataFrame(tsne.fit_transform(self.data), index=self.data.index, columns=['tSNE1', 'tSNE2'])
 
         return tsne_data
