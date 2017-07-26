@@ -719,7 +719,7 @@ class SCRASGui(tk.Tk):
 
     def _run_clustering(self):
         self.clusterOptions.destroy()
-        print("HELLO WORLD")
+
         path = self._datafinder(self.data_list, self.curKey)
         og = self.data[path[0]]
         scobj = mg.SCData.retrieve_data(og, path)
