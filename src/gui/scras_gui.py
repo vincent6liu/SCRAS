@@ -14,11 +14,9 @@ import pandas as pd
 import tkinter as tk
 import numpy as np
 from tkinter import filedialog, ttk
+from scras import scras
 import phenograph
 import csv
-
-sys.path.insert(0, '/Users/vincentliu/PycharmProjects/magic/src/magic')
-import mg_new as mg
 
 
 class SCRASGui(tk.Tk):
@@ -299,12 +297,12 @@ class SCRASGui(tk.Tk):
 
     def showRawDataDistributions(self, file_type='csv'):
         if file_type == 'csv':  # sc-seq data
-            scdata = mg.SCData.from_csv(os.path.expanduser(self.filename), data_name='preprocess', data_type='sc-seq')
+            scdata = scras.SCData.from_csv(os.path.expanduser(self.filename), data_name='preprocess', data_type='sc-seq')
         elif file_type == 'mtx':  # sparse matrix
-            scdata = mg.SCData.from_mtx(os.path.expanduser(self.dataFileName),
+            scdata = scras.SCData.from_mtx(os.path.expanduser(self.dataFileName),
                                         os.path.expanduser(self.geneNameFile))
         elif file_type == '10x':
-            scdata = mg.SCData.from_10x(self.dataDir)
+            scdata = scras.SCData.from_10x(self.dataDir)
 
         self.dataDistributions = tk.Toplevel()
         self.dataDistributions.title(self.fileNameEntryVar.get() + ": raw data distributions")
@@ -358,7 +356,7 @@ class SCRASGui(tk.Tk):
             self.tabs = []
 
         if file_type == 'csv':  # sc-seq data
-            scdata = mg.SCData.from_csv(os.path.expanduser(self.filename), data_name=self.fileNameEntryVar.get(),
+            scdata = scras.SCData.from_csv(os.path.expanduser(self.filename), data_name=self.fileNameEntryVar.get(),
                                         data_type='sc-seq', cell_axis=self.rowVar.get(),
                                         delimiter=self.delimiter.get(),
                                         rows_after_header_to_skip=self.rowHeader.get(),
@@ -426,7 +424,7 @@ class SCRASGui(tk.Tk):
             if parentID:
                 opseq = self._datafinder(self.data_list, parentID)
                 og = self.data[og_name]
-                scobj = mg.SCData.retrieve_data(og, opseq)
+                scobj = scras.SCData.retrieve_data(og, opseq)
                 scobj.datadict.pop(name)
             else:
                 del self.data[og_name]
@@ -442,7 +440,7 @@ class SCRASGui(tk.Tk):
 
             opseq = self._datafinder(self.data_list, key)
             og = self.data[opseq[0]]
-            curdata = mg.SCData.retrieve_data(og, opseq)
+            curdata = scras.SCData.retrieve_data(og, opseq)
 
             for op in curdata.operation.history:
                 self.data_history.insert('', 'end', text=op, open=True)
@@ -598,7 +596,7 @@ class SCRASGui(tk.Tk):
     def _run_dr(self):
         path = self._datafinder(self.data_list, self.curKey)
         og = self.data[path[0]]
-        scobj = mg.SCData.retrieve_data(og, path)
+        scobj = scras.SCData.retrieve_data(og, path)
 
         if self.PCAVAR.get() and not self.DMVar.get():
             old_keys = set(scobj.datadict.keys())
@@ -790,7 +788,7 @@ class SCRASGui(tk.Tk):
 
         path = self._datafinder(self.data_list, self.curKey)
         og = self.data[path[0]]
-        scobj = mg.SCData.retrieve_data(og, path)
+        scobj = scras.SCData.retrieve_data(og, path)
 
         self.phenoProgress = tk.Toplevel()
         self.msgVar = tk.StringVar()
@@ -810,6 +808,8 @@ class SCRASGui(tk.Tk):
                                         jaccard=self.cJaccVar.get(), dis_metric=self.cChoiceVar.get(),
                                         n_jobs=self.cNjobVar.get(), q_tol=self.cToleVar.get(),
                                         louvain_time_limit=self.cLouvVar.get(), nn_method=self.cNNVar.get())
+        if min(set(communities)) == 0:
+            communities = [x+1 for x in communities]
         color = pd.Series(communities)
 
         # plot figure setup
@@ -823,7 +823,7 @@ class SCRASGui(tk.Tk):
         self.msgVar.set("plotting data points...")
         self.phenoProgress.update()
 
-        mg.SCData.plot_tsne(tsnedata, self.fig, self.ax, color=color)
+        scras.SCData.plot_tsne(tsnedata, self.fig, self.ax, color=color)
         self.ax.set_title(scobj.name)
         self.ax.set_xlabel('tSNE1')
         self.ax.set_ylabel('tSNE2')
@@ -858,7 +858,7 @@ class SCRASGui(tk.Tk):
         self.currentPlot = 'phenograph'
         self.phenoProgress.destroy()
 
-        numCluster = np.max(communities) + 1
+        numCluster = np.max(communities)
         communities = [int(i) for i in communities]
         diff = 1 - min(communities)
         communities = [str(i + diff) for i in communities]
@@ -932,7 +932,7 @@ class SCRASGui(tk.Tk):
     def _tsne(self):
         path = self._datafinder(self.data_list, self.curKey)
         og = self.data[path[0]]
-        scobj = mg.SCData.retrieve_data(og, path)
+        scobj = scras.SCData.retrieve_data(og, path)
 
         tsnedata = scobj.run_tsne(self.tPerpVar.get(), self.tIterVar.get(), self.tThetaVar.get())
 
@@ -942,7 +942,7 @@ class SCRASGui(tk.Tk):
         self.ax = self.fig.add_subplot(gs[0, 0])
         color = self.tColorVar.get()
 
-        mg.SCData.plot_tsne(tsnedata, self.fig, self.ax, color=color)
+        scras.SCData.plot_tsne(tsnedata, self.fig, self.ax, color=color)
         self.ax.set_title(scobj.name + ' (color =' + color + ')')
         self.ax.set_xlabel('tSNE1')
         self.ax.set_ylabel('tSNE2')
@@ -1015,7 +1015,7 @@ class SCRASGui(tk.Tk):
     def _scatter_plot(self):
         path = self._datafinder(self.data_list, self.curKey)
         og = self.data[path[0]]
-        scobj = mg.SCData.retrieve_data(og, path)
+        scobj = scras.SCData.retrieve_data(og, path)
 
         # plot figure setup
         self.fig = plt.figure(figsize=[6, 6])

@@ -5,16 +5,16 @@ from setuptools import setup
 from warnings import warn
 
 if sys.version_info.major != 3:
-    raise RuntimeError('Magic requires Python 3')
+    raise RuntimeError('SCRAS requires Python 3')
 
 
-setup(name='phenoGUI',
+setup(name='scrasGUI',
       version='0.0',
-      description='GUI integrating magic and phenograph',
+      description='single cell RNA analysis suite',
       author='',
       author_email='',
       package_dir={'': 'src'},
-      packages=['magic', 'phenograph'],
+      packages=['magic', 'phenograph', 'scras'],
       install_requires=[
           'numpy>=1.10.0',
           'pandas>=0.18.0',
@@ -26,8 +26,8 @@ setup(name='phenoGUI',
           'fcsparser',
           'statsmodels',
       ],
-      scripts=['src/gui/magic_gui.py'],
-      )
+      scripts=['src/gui/scras_gui.py'],
+)
 
 
 # get location of setup.py

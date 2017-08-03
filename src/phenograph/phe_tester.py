@@ -4,6 +4,7 @@ import pandas as pd
 import magic
 import matplotlib
 import matplotlib.pyplot as plt
+import csv
 
 # represent data as a SCData object and automatically normalizes the data
 print("reading data from csv file...")
@@ -13,15 +14,20 @@ scdata = magic.mg.SCData.from_csv("/Users/vincentliu/Desktop/Pe'er Lab/Summer 20
 print("log-transforming the data...")
 scdata.log_transform_scseq_data()
 
+"""
 # run tsne on the processed data and store the tsne values into a pd dataframe
 print("running tSNE on the data...")
 scdata.run_tsne()
-tsne = scdata.tsne
+tsne = scdata.tsne"""
 
 # run phenograph on the processed data
 print("starting PhenoGraph...")
 processed = scdata.data
 communities, graph, Q = phenograph.cluster(processed, k=15)
+print(len(communities))
+communities = ['0' if x == 3 else '1' for x in communities]
+print(len(communities))
+"""
 toPlot = tsne.assign(com=pd.Series(communities).values)
 clusterRec = {}
 for index, row in toPlot.iterrows():
@@ -33,6 +39,7 @@ for index, row in toPlot.iterrows():
     else:
         clfusterRec[row['com']] = [row['tSNE1'], row['tSNE2'], 1]
 
+
 # plot the tsne data and color according to the community assignment by phenograph
 print("plotting the data...")
 fig, ax = plt.subplots()
@@ -41,3 +48,12 @@ for key in clusterRec:
     x, y = clusterRec[key][0], clusterRec[key][1]
     ax.annotate(str(int(key+2)), (x, y))
 plt.show()
+"""
+
+with open("/Users/vincentliu/Desktop/Pe'er Lab/Summer 2017/Data/pbmc4k_short_cluster.csv", 'w') as fwrite:
+    count = 0
+    for i in communities:
+        fwrite.write(i + '\n')
+        count += 1
+    print(count)
+
