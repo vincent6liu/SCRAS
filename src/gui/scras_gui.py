@@ -8,14 +8,12 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from functools import reduce, partial
 import os
-import sys
 import platform
 import pandas as pd
 import tkinter as tk
 import numpy as np
 from tkinter import filedialog, ttk
 from scras import scras
-import phenograph
 import csv
 
 
@@ -263,6 +261,15 @@ class SCRASGui(tk.Tk):
 
             self.wait_window(self.import_options)
 
+    def load_mtx(self):
+        pass  # to be implemented
+
+    def load_10x(self):
+        pass  # to be implemented
+
+    def load_pickle(self):
+        pass  # to be implemented
+
     def _update_mg_options(self):
         if self.magicVar.get():
             self.mgPCAEntry.config(state='normal')
@@ -285,15 +292,6 @@ class SCRASGui(tk.Tk):
             self.mgKaVarEntry.config(state='disabled')
             self.mgEPVar.config(state='disabled')
             self.mgResEntry.config(state='disabled')
-
-    def load_mtx(self):
-        pass  # to be implemented
-
-    def load_10x(self):
-        pass  # to be implemented
-
-    def load_pickle(self):
-        pass  # to be implemented
 
     def showRawDataDistributions(self, file_type='csv'):
         if file_type == 'csv':  # sc-seq data
@@ -472,10 +470,24 @@ class SCRASGui(tk.Tk):
         pass  # to be implemented
 
     def save_data(self):
-        pass  # to be implemented
+        for key in self.data_list.selection():
+            path = self._datafinder(self.data_list, self.curKey)
+            og = self.data[path[0]]
+            scobj = scras.SCData.retrieve_data(og, path)
+            name = self.data_list.item(key)['text'].split(' (')[0]
+            pickleFileName = filedialog.asksaveasfilename(title=name + ': save data', defaultextension='.p',
+                                                          initialfile=key)
+            if pickleFileName is not None:
+                scobj.save(pickleFileName)
 
     def save_plot(self):
-        pass  # to be implemented
+        tab = self.notebook.index(self.notebook.select())
+        default_name = self.notebook.tab(self.notebook.select(), "text")
+
+        plotFileName = filedialog.asksaveasfilename(title='Save Plot', defaultextension='.png',
+                                                         initialfile=default_name)
+        if plotFileName is not None:
+            self.tabs[tab][1].savefig(plotFileName)
 
     def run_dr(self):
         for key in self.data_list.selection():
