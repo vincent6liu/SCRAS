@@ -13,8 +13,12 @@ import pandas as pd
 import tkinter as tk
 import numpy as np
 from tkinter import filedialog, ttk
-from scras import scras
+# from scras import scras
 import csv
+
+import sys
+sys.path.insert(0, '/Users/vincentliu/PycharmProjects/scras/src/scras')
+import scras as scras
 
 
 class SCRASGui(tk.Tk):
@@ -467,7 +471,48 @@ class SCRASGui(tk.Tk):
                         self.data_detail.insert('', 'end', text=gene, open=True)
 
     def concatenate_data(self):
-        pass  # to be implemented
+        self.concatOptions = tk.Toplevel()
+        self.concatOptions.title("Concatenate data sets")
+
+        tk.Label(self.concatOptions, text=u"New data set name:", fg="black", bg="white").grid(column=0, row=0)
+        self.nameVar = tk.StringVar()
+        tk.Entry(self.concatOptions, textvariable=self.nameVar).grid(column=1, row=0)
+
+        self.colVar = tk.IntVar()
+        tk.Radiobutton(self.concatOptions, text='Concatenate columns', variable=self.colVar, value=0).grid(column=0,
+                                                                                                           row=1)
+        tk.Radiobutton(self.concatOptions, text='Concatenate rows', variable=self.colVar, value=1).grid(column=1, row=1)
+
+        self.joinVar = tk.BooleanVar()
+        self.joinVar.set(True)
+        tk.Checkbutton(self.concatOptions, text=u"Outer join", variable=self.joinVar).grid(column=0, row=2,
+                                                                                           columnspan=2)
+
+        tk.Button(self.concatOptions, text="Concatenate", command=self._concatenateData).grid(column=1, row=3)
+        tk.Button(self.concatOptions, text="Cancel", command=self.concatOptions.destroy).grid(column=0, row=3)
+        self.wait_window(self.concatOptions)
+
+    def _concatenateData(self):
+        to_concat = []
+        selected = self.data_list.selection()
+        path = self._datafinder(self.data_list, selected[0])
+        og = self.data[path[0]]
+        scobj = scras.SCData.retrieve_data(og, path)
+        for key in selected[1:]:
+            to_concat.append(self.data[self.data_list.item(key)['text'].split(' (')[0]])
+
+        names = tuple(self.data_list.item(key)['text'].split(' (')[0] for key in selected)
+        join = 'outer' if self.joinVar.get() is True else 'inner'
+        scdata = scobj.concatenate_data(to_concat, names=names, axis=self.colVar.get(), join=join)
+
+        self.data[self.nameVar.get()] = scdata
+        self.data_list.insert('', 'end', text=self.nameVar.get() + ' (' + str(scdata.data.shape[0]) + ' x ' + str(
+            scdata.data.shape[1]) + ')', open=True)
+
+        for key in self.data_list.selection():
+            self.data_list.delete(key)
+
+        self.concatOptions.destroy()
 
     def save_data(self):
         for key in self.data_list.selection():
