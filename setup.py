@@ -15,6 +15,7 @@ setup(name='scras',
       packages=['magic', 'phenograph'],
       package_data={
           'phenograph': ['louvain/*convert*', 'louvain/*community*', 'louvain/*hierarchy*']},
+      include_package_data=True,
       install_requires=[
           'numpy>=1.10.0',
           'pandas>=0.18.0',
