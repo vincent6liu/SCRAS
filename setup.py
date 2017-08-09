@@ -1,20 +1,20 @@
 import os
 import sys
-import shutil
 from setuptools import setup
-from warnings import warn
 
 if sys.version_info.major != 3:
     raise RuntimeError('SCRAS requires Python 3')
 
 
-setup(name='scrasGUI',
+setup(name='scras',
       version='0.0',
-      description='single cell RNA analysis suite',
-      author='',
-      author_email='',
+      description='Single cell RNA analysis suite',
+      author='Vincent Liu',
+      author_email='vincent.liu@columbia.edu',
       package_dir={'': 'src'},
-      packages=['magic', 'phenograph', 'scras'],
+      packages=['magic', 'phenograph'],
+      package_data={
+          'phenograph': ['louvain/*convert*', 'louvain/*community*', 'louvain/*hierarchy*']},
       install_requires=[
           'numpy>=1.10.0',
           'pandas>=0.18.0',
@@ -26,8 +26,8 @@ setup(name='scrasGUI',
           'fcsparser',
           'statsmodels',
       ],
-      scripts=['src/gui/scras_gui.py'],
-)
+      scripts=['src/scras/scras_gui.py'],
+    )
 
 
 # get location of setup.py

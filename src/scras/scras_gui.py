@@ -13,12 +13,8 @@ import pandas as pd
 import tkinter as tk
 import numpy as np
 from tkinter import filedialog, ttk
-# from scras import scras
 import csv
-
-import sys
-sys.path.insert(0, '/Users/vincentliu/PycharmProjects/scras/src/scras')
-import scras as scras
+import scras
 
 
 class SCRASGui(tk.Tk):
