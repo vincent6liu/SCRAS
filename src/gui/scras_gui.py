@@ -885,6 +885,7 @@ class SCRASGui(tk.Tk):
         self.ax.set_xlabel('tSNE1')
         self.ax.set_ylabel('tSNE2')
 
+        """
         # position cluster number at cluster center
         for index, row in toPlot.iterrows():
             if row['com'] in clusterRec:
@@ -898,6 +899,7 @@ class SCRASGui(tk.Tk):
         for key in clusterRec:
             x, y = clusterRec[key][0], clusterRec[key][1]
             self.ax.annotate(str(int(key)), (x, y), fontsize=20, weight='bold', color='#777777')
+        """
 
         # add figure to the GUI
         gs.tight_layout(self.fig)
@@ -933,6 +935,7 @@ class SCRASGui(tk.Tk):
         self.wait_window(self.phenoResult)
 
     def run_gea(self):
+        # pop up a new window reporting the result and provide visualization
         pass  # to be implemented
 
     def tsne(self):

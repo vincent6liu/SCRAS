@@ -1,26 +1,11 @@
-import re
 import os
-import random
 import pickle
-import shlex
-import shutil
 from copy import deepcopy
-from collections import defaultdict, Counter
-from subprocess import call, Popen, PIPE
-import glob
 import warnings
-
 import numpy as np
 import pandas as pd
-
 import matplotlib
-# try:
-#     os.environ['DISPLAY']
-# except KeyError:
-#     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
-from mpl_toolkits.mplot3d import Axes3D
 
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')  # catch experimental ipython widget warning
@@ -28,16 +13,13 @@ with warnings.catch_warnings():
 from matplotlib.font_manager import FontProperties
 
 from sklearn.manifold import TSNE
-from sklearn.manifold.t_sne import _joint_probabilities, _joint_probabilities_nn
 from sklearn.neighbors import NearestNeighbors
 from sklearn.decomposition import PCA
-from scipy.spatial.distance import squareform
-from scipy.sparse import csr_matrix, find, vstack, hstack, issparse, coo
+from scipy.sparse import csr_matrix, find, coo
 from scipy.sparse.linalg import eigs
 from numpy.linalg import norm
 from scipy.stats import gaussian_kde
 from scipy.io import mmread
-from numpy.core.umath_tests import inner1d
 from magic import MAGIC
 import fcsparser
 import phenograph
@@ -143,7 +125,7 @@ class SCData:
         if metadata is None:
             metadata = pd.DataFrame(index=data.index, dtype='O')
 
-        # initiate the data dictionary with the given data
+        # initialize the data dictionary with the given data
         self._name = name
         cols = [np.array(data.columns.values)]
         self._datadict = {'original ' + name: pd.DataFrame(data.values, index=data.index, columns=cols)}
@@ -497,9 +479,6 @@ class SCData:
         :param n_diffusion_components: Number of diffusion components to Generalte
         :return: None
         """
-        #  if self.data_type == 'sc-seq' and 'PCA' not in self.operation.history[-1]:
-        #     print("must provide pcadata for scRNA sequencing data")
-        #     return
 
         N = self.data.shape[0]
 
@@ -623,6 +602,10 @@ class SCData:
         tsne_data = pd.DataFrame(tsne.fit_transform(self.data), index=self.data.index, columns=['tSNE1', 'tSNE2'])
 
         return tsne_data
+
+    def run_dea(self, logfc=0.6):
+        # use the code in mast_tester.py here
+        pass
 
     def plot_molecules_per_cell_and_gene(self, fig=None, ax=None):
         if len(self.operation.history) != 1:
