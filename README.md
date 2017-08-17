@@ -10,10 +10,10 @@ SCRAS is been implemented in Python3.
         $> sudo -H pip3 install .
 
 
-##### GUI
-A python GUI is now available for MAGIC. After following the installation steps listed below, the GUI can be invoked using
+##### To Use
+After following the installation steps listed above, the GUI can be invoked using
 
-        $> scras_gui.py
+        $> python3 src/scras/scras_gui.py 
 
 ##### Acknowledgment
 SCRAS is implemented based on MAGIC (https://github.com/pkathail/magic)
