@@ -7,6 +7,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from functools import reduce, partial
+from mpl_toolkits.mplot3d import Axes3D  # necessary for 3D graph
 import os
 import platform
 import pandas as pd
@@ -55,6 +56,7 @@ class SCRASGui(tk.Tk):
         self.menubar.add_cascade(label="Visualization", menu=self.visMenu)
         self.visMenu.add_command(label="tSNE", state='disabled', command=self.tsne)
         self.visMenu.add_command(label="Scatter plot", state='disabled', command=self.scatter_plot)
+        self.visMenu.add_command(label="Gene expression", state='disabled', command=self.gene_expression)
 
         self.config(menu=self.menubar)
 
@@ -401,6 +403,7 @@ class SCRASGui(tk.Tk):
         self.analysisMenu.entryconfig(1, state='normal')
         self.visMenu.entryconfig(0, state='normal')
         self.visMenu.entryconfig(1, state='normal')
+        self.visMenu.entryconfig(2, state='normal')
 
         if len(self.data) > 1:
             self.fileMenu.entryconfig(4, state='normal')
@@ -1108,6 +1111,32 @@ class SCRASGui(tk.Tk):
             self.ax.mouse_init()
 
         self.scatterOptions.destroy()
+
+    def gene_expression(self):
+        for key in self.data_list.selection():
+            # pop up for parameters
+            self.geOptions = tk.Toplevel()
+            self.geOptions.resizable(False, False)
+            self.geOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": gene expression options")
+            self.curKey = key
+
+            # which feature
+            geXContainer = tk.Frame(self.geOptions)
+            geXContainer.grid(column=0, row=0, sticky='w')
+            tk.Label(geXContainer, text="feature/gene:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            self.geXVar = tk.StringVar()
+            self.geXVar.set('')
+            self.geXEntry = tk.Entry(geXContainer, textvariable=self.geXVar)
+            self.geXEntry.grid(column=1, row=0, sticky='w')
+
+            geButtonContainer = tk.Frame(self.geOptions)
+            geButtonContainer.grid(column=0, row=10)
+            tk.Button(geButtonContainer, text="Cancel", command=self.geOptions.destroy).grid(column=0, row=0)
+            tk.Button(geButtonContainer, text="Run", command=self._gene_expression).grid(column=1, row=0)
+            self.wait_window(self.geOptions)
+
+    def _gene_expression(self):
+        pass
 
     def saveCSV(self, scdata, col):
         self.phenoResult.destroy()
