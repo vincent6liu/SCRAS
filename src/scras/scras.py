@@ -665,7 +665,7 @@ class SCData:
         return fig, ax
 
     @staticmethod
-    def plot_tsne(tsne, fig=None, ax=None, density=False, color=None, title='tSNE projection'):
+    def plot_tsne(tsne, fig=None, ax=None, density=False, color=None, ge=False, title='tSNE projection'):
         """Plot tSNE projections of the data
         Must make sure the object being operated contains tSNE data
         :param tsne: pd.Dataframe that contains tsne data
@@ -677,7 +677,10 @@ class SCData:
         fontP.set_size('xx-small')
 
         fig, ax = get_fig(fig=fig, ax=ax)
-        if isinstance(color, pd.Series):
+        if isinstance(color, pd.Series) and ge:
+            sc = plt.scatter(tsne['tSNE1'], tsne['tSNE2'], s=size,
+                             c=color.values, edgecolors='none', cmap='Oranges')
+        elif isinstance(color, pd.Series) and not ge:  # cluster visualization
             sc = plt.scatter(tsne['tSNE1'], tsne['tSNE2'], s=size,
                              c=color.values, edgecolors='none', cmap='rainbow')
             lp = lambda i: plt.plot([], color=sc.cmap(sc.norm(i)), ms=np.sqrt(size), mec="none",

@@ -1133,10 +1133,47 @@ class SCRASGui(tk.Tk):
             geButtonContainer.grid(column=0, row=10)
             tk.Button(geButtonContainer, text="Cancel", command=self.geOptions.destroy).grid(column=0, row=0)
             tk.Button(geButtonContainer, text="Run", command=self._gene_expression).grid(column=1, row=0)
+
             self.wait_window(self.geOptions)
 
     def _gene_expression(self):
-        pass
+        path = self._datafinder(self.data_list, self.curKey)
+        og = self.data[path[0]]
+        scobj = scras.SCData.retrieve_data(og, path)
+
+        tsnedata = scobj.run_tsne()
+
+        # plot figure setup
+        self.fig = plt.figure(figsize=[6, 6])
+        gs = gridspec.GridSpec(1, 1)
+        self.ax = self.fig.add_subplot(gs[0, 0])
+
+        # store the expression of selected gene as a pd.Series
+        feature = self.geXVar.get()
+        if feature not in scobj.data.columns.values:
+            raise RuntimeError("feature not in values")
+        feature = scobj.data[feature]
+        print(feature)
+
+        scras.SCData.plot_tsne(tsnedata, self.fig, self.ax, color=feature, ge=True)
+        self.ax.set_title(scobj.name + ' (feature =' + self.geXVar.get() + ')')
+        self.ax.set_xlabel('tSNE1')
+        self.ax.set_ylabel('tSNE2')
+
+        gs.tight_layout(self.fig)
+
+        self.tabs.append([tk.Frame(self.notebook), self.fig])
+        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text="tSNE")
+
+        self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
+        self.canvas.show()
+        self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
+
+        self.fileMenu.entryconfig(6, state='normal')
+
+        self.currentPlot = 'tsne'
+
+        self.geOptions.destroy()
 
     def saveCSV(self, scdata, col):
         self.phenoResult.destroy()
