@@ -854,9 +854,6 @@ class SCRASGui(tk.Tk):
 
         self.phenoProgress.update()
 
-        # run tsne with default setting
-        tsnedata = scobj.run_tsne()
-
         self.msgVar.set("running PhenoGraph...")
         self.phenoProgress.update()
         communities, Q = scobj.run_phenograph(k=self.cKVar.get(), directed=self.cDirectedVar.get(),
@@ -864,45 +861,13 @@ class SCRASGui(tk.Tk):
                                         jaccard=self.cJaccVar.get(), dis_metric=self.cChoiceVar.get(),
                                         n_jobs=self.cNjobVar.get(), q_tol=self.cToleVar.get(),
                                         louvain_time_limit=self.cLouvVar.get(), nn_method=self.cNNVar.get())
-        if min(set(communities)) == 0:
-            communities = [x+1 for x in communities]
-        color = pd.Series(communities)
-
-        # plot figure setup
-        toPlot = tsnedata.assign(com=pd.Series(color).values)
-        clusterRec = {}
-        self.fig = plt.figure(figsize=[6, 6])
-        gs = gridspec.GridSpec(1, 1)
-        self.ax = self.fig.add_subplot(gs[0, 0])
 
         # plot tsne using communities to label color
         self.msgVar.set("plotting data points...")
         self.phenoProgress.update()
-
-        scras.SCData.plot_tsne(tsnedata, self.fig, self.ax, color=color)
-        self.ax.set_title(scobj.name)
-        self.ax.set_xlabel('tSNE1')
-        self.ax.set_ylabel('tSNE2')
-
-        """
-        # position cluster number at cluster center
-        for index, row in toPlot.iterrows():
-            if row['com'] in clusterRec:
-                count = clusterRec[row['com']][2]
-                new1 = (clusterRec[row['com']][0] * count + row['tSNE1']) / (count + 1)
-                new2 = (clusterRec[row['com']][1] * count + row['tSNE2']) / (count + 1)
-                clusterRec[row['com']] = [new1, new2, count + 1]
-            else:
-                clusterRec[row['com']] = [row['tSNE1'], row['tSNE2'], 1]
-
-        for key in clusterRec:
-            x, y = clusterRec[key][0], clusterRec[key][1]
-            self.ax.annotate(str(int(key)), (x, y), fontsize=20, weight='bold', color='#777777')
-        """
+        self._visualizeCluster(scobj)
 
         # add figure to the GUI
-        gs.tight_layout(self.fig)
-
         self.tabs.append([tk.Frame(self.notebook), self.fig])
         self.notebook.add(self.tabs[len(self.tabs) - 1][0], text="PhenoGraph")
 
@@ -929,7 +894,7 @@ class SCRASGui(tk.Tk):
                                                                                                     row=2, sticky='w')
         tk.Button(self.phenoResult, text="Ok", command=self.phenoResult.destroy).grid(column=0, row=3)
         tk.Button(self.phenoResult, text="Save communities as CSV",
-                  command=lambda: self.saveCSV(scobj, pd.Series(communities))).grid(column=1, row=3)
+                  command=lambda: self.saveCluster(scobj, pd.Series(communities))).grid(column=1, row=3)
         self.phenoResult.update()
         self.wait_window(self.phenoResult)
 
@@ -1150,13 +1115,13 @@ class SCRASGui(tk.Tk):
 
         # store the expression of selected gene as a pd.Series
         feature = self.geXVar.get()
+        feature = feature.upper()
         if feature not in scobj.data.columns.values:
             raise RuntimeError("feature not in values")
-        feature = scobj.data[feature]
-        print(feature)
+        expression = scobj.data[feature]
 
-        scras.SCData.plot_tsne(tsnedata, self.fig, self.ax, color=feature, ge=True)
-        self.ax.set_title(scobj.name + ' (feature =' + self.geXVar.get() + ')')
+        scras.SCData.plot_tsne(tsnedata, self.fig, self.ax, color=expression, ge=True)
+        self.ax.set_title(scobj.name + ' (feature =' + feature + ')')
         self.ax.set_xlabel('tSNE1')
         self.ax.set_ylabel('tSNE2')
 
@@ -1175,30 +1140,37 @@ class SCRASGui(tk.Tk):
 
         self.geOptions.destroy()
 
-    def saveCSV(self, scdata, col):
+    def _visualizeCluster(self, scobj):
+        if scobj.clusterinfo is None:
+            raise RuntimeError("Missing cluster information")
+        tsnedata = scobj.run_tsne()
+        communities = scobj.clusterinfo.cluster['cluster']
+
+        if min(set(communities)) == 0:
+            communities = [x+1 for x in communities]
+        color = communities
+
+        self.fig = plt.figure(figsize=[6, 6])
+        gs = gridspec.GridSpec(1, 1)
+        self.ax = self.fig.add_subplot(gs[0, 0])
+
+        scras.SCData.plot_tsne(tsnedata, self.fig, self.ax, color=color)
+        self.ax.set_title(scobj.name)
+        self.ax.set_xlabel('tSNE1')
+        self.ax.set_ylabel('tSNE2')
+
+        gs.tight_layout(self.fig)
+
+    def saveCluster(self, scdata, col):
+        """
+        Saves the cluster info as a dataframe where the indexes are cell barcodes and row is cluster number
+        """
         self.phenoResult.destroy()
 
-        toSave = scdata.data.assign(com=pd.Series(col).values)
+        toSave = scdata.clusterinfo.cluster
         csvFile = filedialog.asksaveasfile(title='Save as CSV', defaultextension='.csv', mode='w')
 
-        if csvFile:
-            clusters = []
-            cell_map = {}
-            for index, row in toSave.iterrows():
-                if row['com'] in clusters:
-                    cell_map[row['com']].append(index)
-                else:
-                    clusters.append(row['com'])
-                    cell_map[row['com']] = [index]
-
-            clusters = sorted(clusters)
-        else:
-            return
-
-        writer = csv.writer(csvFile, delimiter=',')
-        writer.writerow(clusters)
-        for clus in clusters:
-            writer.writerow(cell_map[clus])
+        toSave.to_csv(csvFile)
 
         csvFile.close()
 

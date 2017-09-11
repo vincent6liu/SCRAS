@@ -66,13 +66,9 @@ def density_2d(x, y):
 
 
 class ClusterInfo:
-    def __init__(self, communities, graph, Q, method='phenograph'):
-        if not isinstance(communities, np.ndarray):
-            raise TypeError("communities must be a numpy array")
-        elif not isinstance(graph, coo.coo_matrix):
-            raise TypeError("graph must be of type scipy.coo.coo_matrix")
-        elif not isinstance(Q, float):
-            raise TypeError("modularity score Q must be float")
+    def __init__(self, communities, graph=None, Q=None, method='phenograph'):
+        if not isinstance(communities, pd.DataFrame):
+            raise TypeError("communities must be a pandas dataframe")
         self._cluster = communities
         self._graph = graph
         self._modscore = Q
@@ -117,7 +113,8 @@ class Operations:
 
 
 class SCData:
-    def __init__(self, name: str, data, data_type='sc-seq', metadata=None, operation: Operations = None):
+    def __init__(self, name: str, data, data_type='sc-seq', metadata=None,
+                 operation: Operations = None, clusterinfo: ClusterInfo = None):
         if not (isinstance(data, pd.DataFrame)):
             raise TypeError('data must be of type DataFrame')
         if data_type not in ['sc-seq', 'masscyt']:
@@ -135,7 +132,7 @@ class SCData:
         self._operation = Operations(sourcename=self.name) if operation is None \
             else Operations(inherite=operation.history)
 
-        self._clusterinfo = None
+        self._clusterinfo = clusterinfo
 
         # Library size
         self._library_sizes = None
@@ -210,11 +207,11 @@ class SCData:
         self._metadata = item
 
     @property
-    def cluster(self):
+    def clusterinfo(self):
         return self._clusterinfo
 
-    @cluster.setter
-    def cluster(self, cluobj):
+    @clusterinfo.setter
+    def clusterinfo(self, cluobj):
         self._clusterinfo = cluobj
 
     @property
@@ -573,7 +570,8 @@ class SCData:
                                                    q_tol=q_tol, louvain_time_limit=louvain_time_limit,
                                                    nn_method=nn_method)
         communities = np.add(communities, 1)
-        self.cluster = ClusterInfo(communities, graph, Q, 'phenograph')
+        cluster_df = pd.DataFrame({'cluster': communities}, index=self.data.index)
+        self.clusterinfo = ClusterInfo(cluster_df, graph, Q, 'phenograph')
 
         return communities, Q
 
@@ -679,7 +677,7 @@ class SCData:
         fig, ax = get_fig(fig=fig, ax=ax)
         if isinstance(color, pd.Series) and ge:
             sc = plt.scatter(tsne['tSNE1'], tsne['tSNE2'], s=size,
-                             c=color.values, edgecolors='none', cmap='Oranges')
+                             c=color.values, edgecolors='none', cmap='PiYG')
         elif isinstance(color, pd.Series) and not ge:  # cluster visualization
             sc = plt.scatter(tsne['tSNE1'], tsne['tSNE2'], s=size,
                              c=color.values, edgecolors='none', cmap='rainbow')
