@@ -16,6 +16,7 @@ import numpy as np
 from tkinter import filedialog, ttk
 import csv
 import scras
+from copy import deepcopy
 
 
 class SCRASGui(tk.Tk):
@@ -39,12 +40,12 @@ class SCRASGui(tk.Tk):
 
         # set up menu bar
         self.menubar.add_cascade(label="File", menu=self.fileMenu)
-        self.fileMenu.add_command(label="Load csv file", command=self.load_csv)
-        self.fileMenu.add_command(label="Load sparse data file", command=self.load_mtx)
-        self.fileMenu.add_command(label="Load 10x file", command=self.load_10x)
-        self.fileMenu.add_command(label="Load saved session from pickle file", command=self.load_pickle)
-        self.fileMenu.add_command(label="Concatenate datasets", state='disabled', command=self.concatenate_data)
-        self.fileMenu.add_command(label="Save data", state='disabled', command=self.save_data)
+        self.fileMenu.add_command(label="Load Csv File", command=self.load_csv)
+        # self.fileMenu.add_command(label="Load sparse data file", command=self.load_mtx)
+        # self.fileMenu.add_command(label="Load 10x file", command=self.load_10x)
+        # self.fileMenu.add_command(label="Load saved session from pickle file", command=self.load_pickle)
+        self.fileMenu.add_command(label="Concatenate Datasets", state='disabled', command=self.concatenate_data)
+        # self.fileMenu.add_command(label="Save data", state='disabled', command=self.save_data)
         self.fileMenu.add_command(label="Save plot", state='disabled', command=self.save_plot)
         self.fileMenu.add_command(label="Exit", command=self.quit_scras())
 
@@ -55,8 +56,8 @@ class SCRASGui(tk.Tk):
 
         self.menubar.add_cascade(label="Visualization", menu=self.visMenu)
         self.visMenu.add_command(label="tSNE", state='disabled', command=self.tsne)
-        self.visMenu.add_command(label="Scatter plot", state='disabled', command=self.scatter_plot)
-        self.visMenu.add_command(label="Gene expression", state='disabled', command=self.gene_expression)
+        self.visMenu.add_command(label="Scatter Plot", state='disabled', command=self.scatter_plot)
+        self.visMenu.add_command(label="Gene Expression", state='disabled', command=self.gene_expression)
 
         self.config(menu=self.menubar)
 
@@ -351,7 +352,7 @@ class SCRASGui(tk.Tk):
             xsb3 = ttk.Scrollbar(orient=tk.HORIZONTAL, command=self.data_history.xview)
             self.data_history.configure(yscroll=ysb3.set, xscroll=xsb3.set)
 
-            self.notebook = ttk.Notebook(height=600, width=600)
+            self.notebook = ttk.Notebook(height=600, width=800)
             self.notebook.grid(column=1, row=0, rowspan=14, columnspan=4, sticky='NSEW')
             self.tabs = []
 
@@ -398,7 +399,7 @@ class SCRASGui(tk.Tk):
                                               ' x ' + str(scdata.data.shape[1]) + ')', open=True)
 
         # enable buttons
-        self.fileMenu.entryconfig(5, state='normal')
+        # self.fileMenu.entryconfig(5, state='normal')
         self.analysisMenu.entryconfig(0, state='normal')
         self.analysisMenu.entryconfig(1, state='normal')
         self.visMenu.entryconfig(0, state='normal')
@@ -406,9 +407,9 @@ class SCRASGui(tk.Tk):
         self.visMenu.entryconfig(2, state='normal')
 
         if len(self.data) > 1:
-            self.fileMenu.entryconfig(4, state='normal')
+            self.fileMenu.entryconfig(1, state='normal')
 
-        self.geometry('1000x650')
+        self.geometry('1200x650')
 
         self.import_options.destroy()
 
@@ -448,22 +449,25 @@ class SCRASGui(tk.Tk):
 
             magic = True if 'MAGIC' in name else False
 
+            # sort the gene names alphabetically
+            to_add = curdata.data.reindex_axis(sorted(curdata.data.columns), axis=1)
+
             if 'PCA' in name:
-                for i in range(curdata.data.shape[1]):
+                for i in range(to_add.shape[1]):
                     if magic:
                         self.data_detail.insert('', 'end', text='MAGIC PC' + str(i + 1), open=True)
                     else:
                         self.data_detail.insert('', 'end', text='PC' + str(i + 1), open=True)
 
             elif 'DM' in name:
-                for i in range(curdata.data.shape[1]):
+                for i in range(to_add.shape[1]):
                     if magic:
                         self.data_detail.insert('', 'end', text='MAGIC DC' + str(i + 1), open=True)
                     else:
                         self.data_detail.insert('', 'end', text='DC' + str(i + 1), open=True)
 
             else:
-                for gene in curdata.data:
+                for gene in to_add:
                     if magic:
                         self.data_detail.insert('', 'end', text='MAGIC ' + gene, open=True)
                     else:
@@ -683,7 +687,7 @@ class SCRASGui(tk.Tk):
             self.canvas.show()
             self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
-            self.fileMenu.entryconfig(6, state='normal')
+            self.fileMenu.entryconfig(2, state='normal')
 
             self.currentPlot = 'pcavariance'
 
@@ -727,7 +731,7 @@ class SCRASGui(tk.Tk):
             self.canvas.show()
             self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
-            self.fileMenu.entryconfig(6, state='normal')
+            self.fileMenu.entryconfig(2, state='normal')
 
             self.currentPlot = 'pcavariance'
 
@@ -876,7 +880,7 @@ class SCRASGui(tk.Tk):
         self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
         # enable plot saving
-        self.fileMenu.entryconfig(6, state='normal')
+        self.fileMenu.entryconfig(2, state='normal')
 
         self.currentPlot = 'phenograph'
         self.phenoProgress.destroy()
@@ -960,8 +964,9 @@ class SCRASGui(tk.Tk):
 
         tsnedata = scobj.run_tsne(self.tPerpVar.get(), self.tIterVar.get(), self.tThetaVar.get())
 
+
         # plot figure setup
-        self.fig = plt.figure(figsize=[6, 6])
+        self.fig = plt.figure(figsize=[8, 6])
         gs = gridspec.GridSpec(1, 1)
         self.ax = self.fig.add_subplot(gs[0, 0])
         color = self.tColorVar.get()
@@ -980,7 +985,7 @@ class SCRASGui(tk.Tk):
         self.canvas.show()
         self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
-        self.fileMenu.entryconfig(6, state='normal')
+        self.fileMenu.entryconfig(2, state='normal')
 
         self.currentPlot = 'tsne'
 
@@ -1042,7 +1047,7 @@ class SCRASGui(tk.Tk):
         scobj = scras.SCData.retrieve_data(og, path)
 
         # plot figure setup
-        self.fig = plt.figure(figsize=[6, 6])
+        self.fig = plt.figure(figsize=[8, 6])
         gs = gridspec.GridSpec(1, 1)
         if self.sZVar.get() != '':  # 3D graph
             self.ax = self.fig.add_subplot(gs[0, 0], projection='3d')
@@ -1109,7 +1114,7 @@ class SCRASGui(tk.Tk):
         tsnedata = scobj.run_tsne()
 
         # plot figure setup
-        self.fig = plt.figure(figsize=[6, 6])
+        self.fig = plt.figure(figsize=[8, 6])
         gs = gridspec.GridSpec(1, 1)
         self.ax = self.fig.add_subplot(gs[0, 0])
 
@@ -1128,13 +1133,13 @@ class SCRASGui(tk.Tk):
         gs.tight_layout(self.fig)
 
         self.tabs.append([tk.Frame(self.notebook), self.fig])
-        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text="tSNE")
+        self.notebook.add(self.tabs[len(self.tabs) - 1][0], text=feature)
 
         self.canvas = FigureCanvasTkAgg(self.fig, self.tabs[len(self.tabs) - 1][0])
         self.canvas.show()
         self.canvas.get_tk_widget().grid(column=1, row=1, rowspan=10, columnspan=4, sticky='NSEW')
 
-        self.fileMenu.entryconfig(6, state='normal')
+        self.fileMenu.entryconfig(2, state='normal')
 
         self.currentPlot = 'tsne'
 
@@ -1150,7 +1155,7 @@ class SCRASGui(tk.Tk):
             communities = [x+1 for x in communities]
         color = communities
 
-        self.fig = plt.figure(figsize=[6, 6])
+        self.fig = plt.figure(figsize=[8, 6])
         gs = gridspec.GridSpec(1, 1)
         self.ax = self.fig.add_subplot(gs[0, 0])
 

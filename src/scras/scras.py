@@ -677,14 +677,17 @@ class SCData:
         fig, ax = get_fig(fig=fig, ax=ax)
         if isinstance(color, pd.Series) and ge:
             sc = plt.scatter(tsne['tSNE1'], tsne['tSNE2'], s=size,
-                             c=color.values, edgecolors='none', cmap='PiYG')
+                             c=color.values, edgecolors='none', cmap='RdYlGn')
+            plt.colorbar()
         elif isinstance(color, pd.Series) and not ge:  # cluster visualization
             sc = plt.scatter(tsne['tSNE1'], tsne['tSNE2'], s=size,
                              c=color.values, edgecolors='none', cmap='rainbow')
             lp = lambda i: plt.plot([], color=sc.cmap(sc.norm(i)), ms=np.sqrt(size), mec="none",
                                     label="Cluster {:g}".format(i), ls="", marker="o")[0]
             handles = [lp(int(i)) for i in np.unique(color)]
+
             plt.legend(handles=handles, prop=fontP, loc='upper right').set_frame_on(True)
+
         elif density:
             # Calculate the point density
             xy = np.vstack([tsne['tSNE1'], tsne['tSNE2']])
