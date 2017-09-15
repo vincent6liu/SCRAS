@@ -669,7 +669,7 @@ class SCRASGui(tk.Tk):
                                                            ' x ' + str(pcadata.data.shape[1]) + ')', open=True)
 
             # plot figure setup
-            self.fig = plt.figure(figsize=[6, 6])
+            self.fig = plt.figure(figsize=[8, 6])
             gs = gridspec.GridSpec(1, 1)
             self.ax = self.fig.add_subplot(gs[0, 0])
             pcadata.plot_pca_variance_explained(self.pCompVar.get(), self.fig, self.ax, random=self.pRandomVar.get())
