@@ -1091,11 +1091,16 @@ class SCRASGui(tk.Tk):
             self.curKey = key
 
             # which feature
+            entry = []
+            for key in self.data_detail.selection():
+                curgene = self.data_detail.item(key, 'text')
+                entry.append(curgene)
+            entry = ', '.join(entry)
             geXContainer = tk.Frame(self.geOptions)
             geXContainer.grid(column=0, row=0, sticky='w')
             tk.Label(geXContainer, text="feature/gene:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
             self.geXVar = tk.StringVar()
-            self.geXVar.set('')
+            self.geXVar.set(entry)
             self.geXEntry = tk.Entry(geXContainer, textvariable=self.geXVar)
             self.geXEntry.grid(column=1, row=0, sticky='w')
 
@@ -1149,6 +1154,7 @@ class SCRASGui(tk.Tk):
         if scobj.clusterinfo is None:
             raise RuntimeError("Missing cluster information")
         tsnedata = scobj.run_tsne()
+        tsnedata.to_csv("/Users/vincentliu/Desktop/magic_tsne.csv")
         communities = scobj.clusterinfo.cluster['cluster']
 
         if min(set(communities)) == 0:

@@ -676,8 +676,9 @@ class SCData:
 
         fig, ax = get_fig(fig=fig, ax=ax)
         if isinstance(color, pd.Series) and ge:
+            col = color
             sc = plt.scatter(tsne['tSNE1'], tsne['tSNE2'], s=size,
-                             c=color.values, edgecolors='none', cmap='RdYlGn')
+                             c=col.values, edgecolors='none', cmap='coolwarm')
             plt.colorbar()
         elif isinstance(color, pd.Series) and not ge:  # cluster visualization
             sc = plt.scatter(tsne['tSNE1'], tsne['tSNE2'], s=size,
