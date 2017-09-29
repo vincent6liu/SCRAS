@@ -114,7 +114,7 @@ class Operations:
 
 class SCData:
     def __init__(self, name: str, data, data_type='sc-seq', metadata=None,
-                 operation: Operations = None, clusterinfo: ClusterInfo = None):
+                 operation: Operations = None, clusterinfo: ClusterInfo = None, parent=None):
         if not (isinstance(data, pd.DataFrame)):
             raise TypeError('data must be of type DataFrame')
         if data_type not in ['sc-seq', 'masscyt']:
@@ -133,6 +133,8 @@ class SCData:
             else Operations(inherite=operation.history)
 
         self._clusterinfo = clusterinfo
+
+        self._parent = parent
 
         # Library size
         self._library_sizes = None
@@ -213,6 +215,14 @@ class SCData:
     @clusterinfo.setter
     def clusterinfo(self, cluobj):
         self._clusterinfo = cluobj
+
+    @property
+    def parent(self):
+        return self._parent
+
+    @parent.setter
+    def parent(self, parent):
+        self._parent = parent
 
     @property
     def library_sizes(self):
@@ -457,7 +467,7 @@ class SCData:
             count += 1
             key = key_base + ':' + str(count)
 
-        scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation)
+        scdata = SCData(key, new_data, self.data_type, self.metadata, self.operation, parent=self)
         scdata.operation.add('PCA', str(n_components))
 
         if not no_effect:
@@ -555,7 +565,7 @@ class SCData:
             count += 1
             key = key_base + ':' + str(count)
 
-        scdata = SCData(key, diffusion_eigenvectors, self.data_type, self.metadata, self.operation)
+        scdata = SCData(key, diffusion_eigenvectors, self.data_type, self.metadata, self.operation, parent=self)
         scdata.operation.add('DM', par)
         self.datadict[key] = scdata
 
@@ -686,6 +696,8 @@ class SCData:
             lp = lambda i: plt.plot([], color=sc.cmap(sc.norm(i)), ms=np.sqrt(size), mec="none",
                                     label="Cluster {:g}".format(i), ls="", marker="o")[0]
             handles = [lp(int(i)) for i in np.unique(color)]
+            # plt.legend(bbox_to_anchor=(1.01, 1), loc=2, borderaxespad=0.,
+            #            markerscale=3, handles=handles, prop=fontP).set_frame_on(True)
 
             plt.legend(handles=handles, prop=fontP, loc='upper right').set_frame_on(True)
 

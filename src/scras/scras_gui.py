@@ -1124,11 +1124,13 @@ class SCRASGui(tk.Tk):
         self.ax = self.fig.add_subplot(gs[0, 0])
 
         # store the expression of selected gene as a pd.Series
-        feature = self.geXVar.get()
-        feature = feature.upper()
-        if feature not in scobj.data.columns.values:
+        feature = self.geXVar.get().upper()
+        if feature in scobj.data.columns.values:
+            expression = scobj.data[feature]
+        elif feature in scobj.parent.data.columns.values:
+            expression = scobj.parent.data[feature]
+        else:
             raise RuntimeError("feature not in values")
-        expression = scobj.data[feature]
 
         scras.SCData.plot_tsne(tsnedata, self.fig, self.ax, color=expression, ge=True)
         self.ax.set_title(scobj.name + ' (feature =' + feature + ')')
@@ -1154,7 +1156,6 @@ class SCRASGui(tk.Tk):
         if scobj.clusterinfo is None:
             raise RuntimeError("Missing cluster information")
         tsnedata = scobj.run_tsne()
-        tsnedata.to_csv("/Users/vincentliu/Desktop/magic_tsne.csv")
         communities = scobj.clusterinfo.cluster['cluster']
 
         if min(set(communities)) == 0:
