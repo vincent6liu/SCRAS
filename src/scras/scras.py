@@ -23,6 +23,9 @@ from scipy.io import mmread
 from magic import MAGIC
 import fcsparser
 import phenograph
+import pandas as pd
+import subprocess
+import os
 
 # set plotting defaults
 with warnings.catch_warnings():
@@ -112,6 +115,23 @@ class Operations:
         self._history.clear()
 
 
+class DEA:
+    def __init__(self, key, result):
+        if not isinstance(key, tuple) or len(key) != 2 or not isinstance(key[0], set) or not isinstance(key[1], set):
+            raise TypeError('invalid DEA key')
+        if not isinstance(result, pd.DataFrame):
+            raise TypeError('result must be a pd dataframe')
+
+        self._results = {key: result}
+
+    @property
+    def results(self):
+        return self._results
+
+    def add_result(self, key, result):
+        self.results[key] = result
+
+
 class SCData:
     def __init__(self, name: str, data, data_type='sc-seq', metadata=None,
                  operation: Operations = None, clusterinfo: ClusterInfo = None, parent=None):
@@ -133,6 +153,7 @@ class SCData:
             else Operations(inherite=operation.history)
 
         self._clusterinfo = clusterinfo
+        self._deainfo = None
 
         self._parent = parent
 
@@ -215,6 +236,14 @@ class SCData:
     @clusterinfo.setter
     def clusterinfo(self, cluobj):
         self._clusterinfo = cluobj
+
+    @property
+    def deainfo(self):
+        return self._deainfo
+
+    @deainfo.setter
+    def deainfo(self, dea):
+        self._deainfo = dea
 
     @property
     def parent(self):
@@ -611,9 +640,49 @@ class SCData:
 
         return tsne_data
 
-    def run_dea(self, logfc=0.6):
-        # use the code in mast_tester.py here
-        pass
+    def run_dea(self, c_set1, c_arr, c_set2=None):
+        """
+        :param c_set1: set of clusters to compare with everything
+        :param c_set2: a specific set of clusters to comapre with set 1
+        :param exp_matrix: the dataframe containing the dataset with rows are cells and columns are genes
+        :param c_arr: the array storing the cluster id each cell belonging to
+        :param tmp_input_prefix: temporary file to be written out for importing by MAST in an R environment
+        :param tmp_result_prefix: temporary result file output by MAST
+        """
+        c_arr = np.array(c_arr)
+        c_set1 = list(c_set1)
+        c_set2 = list(c_set2) if c_set2 is not None else list(set(c_arr)-set(c_set1))
+        print(c_set1), print(c_set2)
+
+        tmp_input_file, tmp_output_file = "SCRAS_MAST_tmp_in.csv", "SCRAS_MAST_tmp_out.csv"
+
+        reduced_exp_matrix1 = self.data.iloc[np.where(np.isin(c_arr, c_set1))[0]]
+        reduced_exp_matrix2 = self.data.iloc[np.where(np.isin(c_arr, c_set2))[0]]
+
+        reduced_exp_matrix = pd.concat([reduced_exp_matrix1, reduced_exp_matrix2])
+        reduced_exp_matrix.index = pd.Index([1 if i < len(reduced_exp_matrix1.index) else 0
+                                             for i in range(len(reduced_exp_matrix1.index) +
+                                                            len(reduced_exp_matrix2.index))])
+        reduced_exp_matrix.to_csv(tmp_input_file)
+
+        args = 'RScript ../MAST/runMAST.R {i} {o}'.format(i=tmp_input_file, o=tmp_output_file)
+
+        with subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True) as p:
+            out, err = p.communicate()
+        print(out), print(err)
+
+        result_df = pd.read_csv(tmp_output_file, index_col=0)
+        result_df = result_df[result_df['cont.Pr(>Chisq)'] < 0.05]
+        result_df = result_df[['cont.Pr(>Chisq)']].sort_values(by='cont.Pr(>Chisq)')
+        os.remove(tmp_input_file), os.remove(tmp_output_file)
+
+        key = (set(c_set1), set(c_set2))
+        if self.deainfo is None:
+            self.deainfo = DEA(key, result_df)
+        else:
+            self.deainfo.add_result(key, result_df)
+
+        return result_df
 
     def plot_molecules_per_cell_and_gene(self, fig=None, ax=None):
         if len(self.operation.history) != 1:

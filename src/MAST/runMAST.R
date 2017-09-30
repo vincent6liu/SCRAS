@@ -1,6 +1,6 @@
 suppressMessages(library(MAST))
 #suppressMessages(library(knitr))
-options(mc.cores = 1) # gives me error messages when I use > 1
+options(mc.cores = parallel::detectCores() - 2) # gives me error messages when I use > 1
 #knitr::opts_chunk$set(message = FALSE,error = FALSE,warning = FALSE,cache = TRUE,
 #                      fig.width=8, fig.height=6, auto.dep=TRUE)
 
@@ -43,7 +43,7 @@ runMAST <- function(df, sg) {
   colData(sca)$cond <- as.numeric(unlist(as.list(sg)))
   
   # carry out DE analysis
-  zlmCond <- zlm(~cond + cngeneson, sca)
+  zlmCond <- zlm(~cond + cngeneson, sca, parallel = TRUE)
   res <- lrTest(zlmCond, CoefficientHypothesis("cond"))
   
   return(res)
