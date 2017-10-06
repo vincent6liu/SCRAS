@@ -17,6 +17,7 @@ from tkinter import filedialog, ttk
 import csv
 import scras
 from copy import deepcopy
+import re
 
 
 class SCRASGui(tk.Tk):
@@ -473,6 +474,12 @@ class SCRASGui(tk.Tk):
                     else:
                         self.data_detail.insert('', 'end', text=gene, open=True)
 
+            # determine if differential expression analysis is eligible
+            if curdata.clusterinfo is not None:
+                self.analysisMenu.entryconfig(2, state='normal')
+            else:
+                self.analysisMenu.entryconfig(2, state='disabled')
+
     def concatenate_data(self):
         self.concatOptions = tk.Toplevel()
         self.concatOptions.title("Concatenate data sets")
@@ -903,8 +910,85 @@ class SCRASGui(tk.Tk):
         self.wait_window(self.phenoResult)
 
     def run_gea(self):
-        # pop up a new window reporting the result and provide visualization
-        pass  # to be implemented
+        key = self.data_list.selection()[0]
+        self.geaOptions = tk.Toplevel()
+        self.geaOptions.title(self.data_list.item(key)['text'].split(' (')[0] + ": DEA options")
+        self.curKey = key
+
+        # what are the first clusters
+        c1Container = tk.Frame(self.geaOptions)
+        c1Container.grid(column=0, row=0, sticky='w')
+        tk.Label(c1Container, text="First set of clusters:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+        self.c1Var = tk.StringVar()
+        self.c1Var.set('')
+        tk.Entry(c1Container, textvariable=self.c1Var).grid(column=1, row=0, sticky='w')
+
+        # what are the second clusters
+        c2Container = tk.Frame(self.geaOptions)
+        c2Container.grid(column=0, row=1, sticky='w')
+        tk.Label(c2Container, text="Second set of clusters:", fg="black", bg="white").grid(column=0, row=0, sticky='w')
+        self.c2Var = tk.StringVar()
+        self.c2Var.set('')
+        tk.Entry(c2Container, textvariable=self.c2Var).grid(column=1, row=0, sticky='w')
+
+        tk.Label(self.geaOptions, text="Note: all values should be comma-separated and if the second set is left blank,"
+                                       " all clusters not in the first set will be included").grid(column=0, row=2,
+                                                                                                   sticky='w')
+
+        geaButtonContainer = tk.Frame(self.geaOptions)
+        geaButtonContainer.grid(column=0, row=3)
+        tk.Button(geaButtonContainer, text="Cancel", command=self.geaOptions.destroy).grid(column=0, row=0)
+        tk.Button(geaButtonContainer, text="Run", command=self._run_gea).grid(column=1, row=0)
+        self.wait_window(self.geaOptions)
+
+    def _run_gea(self):
+        path = self._datafinder(self.data_list, self.curKey)
+        og = self.data[path[0]]
+        scobj = scras.SCData.retrieve_data(og, path)
+        valid_clusters = scobj.clusterinfo.cluster['cluster'].values.tolist()
+        valid_clusters = set([str(x) for x in valid_clusters])
+
+        print(valid_clusters)
+
+        # error checking to make sure the input clusters are valid
+        clus1 = re.split('[, ]+', self.c1Var.get().upper())
+        clus2 = re.split('[, ]+', self.c2Var.get().upper())
+        for clus in clus1+clus2:
+            if clus not in valid_clusters and clus != '':
+                geaWarning = tk.Toplevel()
+                geaWarning.title("Invalid cluster")
+                tk.Label(geaWarning, text="cluster " + str(clus) + " is not valid",
+                         fg="black", bg="white").grid(column=0, row=0, sticky='w')
+                tk.Button(geaWarning, text="Ok", command=geaWarning.destroy).grid(column=0, row=1)
+                self.wait_window(geaWarning)
+                return
+        if set(clus1) == valid_clusters:
+            geaWarning = tk.Toplevel()
+            geaWarning.title("Invalid cluster")
+            tk.Label(geaWarning, text="cannot compare all clusters to nothing",
+                     fg="black", bg="white").grid(column=0, row=0, sticky='w')
+            tk.Button(geaWarning, text="Ok", command=geaWarning.destroy).grid(column=0, row=1)
+            self.wait_window(geaWarning)
+            return
+
+        self.geaOptions.destroy()
+
+        geaWait = tk.Toplevel()
+        geaWait.title("GEA in progress...")
+        geaWait.resizable(False, False)
+        tk.Label(geaWait, text="differential expression analysis in progress...",
+                 fg="black", bg="white").grid(column=0, row=0, sticky='w')
+
+        clus1 = set([int(x) for x in clus1])
+        clus2 = None if self.c2Var.get() == '' else set([int(x) for x in clus2])
+        print(type(clus2))
+        print(clus1)
+        res = scobj.run_dea(clus1, clus2)
+        print(res)
+
+        geaWait.destroy()
+
+
 
     def tsne(self):
         for key in self.data_list.selection():

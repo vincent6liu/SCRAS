@@ -117,7 +117,8 @@ class Operations:
 
 class DEA:
     def __init__(self, key, result):
-        if not isinstance(key, tuple) or len(key) != 2 or not isinstance(key[0], set) or not isinstance(key[1], set):
+        if not isinstance(key, tuple) or len(key) != 2 or \
+           not isinstance(key[0], tuple) or not isinstance(key[1], tuple):
             raise TypeError('invalid DEA key')
         if not isinstance(result, pd.DataFrame):
             raise TypeError('result must be a pd dataframe')
@@ -611,6 +612,8 @@ class SCData:
         communities = np.add(communities, 1)
         cluster_df = pd.DataFrame({'cluster': communities}, index=self.data.index)
         self.clusterinfo = ClusterInfo(cluster_df, graph, Q, 'phenograph')
+        if self.parent is not None:
+            self.parent.clusterinfo = ClusterInfo(cluster_df, graph, Q, 'phenograph')
 
         return communities, Q
 
@@ -640,19 +643,20 @@ class SCData:
 
         return tsne_data
 
-    def run_dea(self, c_set1, c_arr, c_set2=None):
+    def run_dea(self, c_set1, c_set2=None):
         """
         :param c_set1: set of clusters to compare with everything
-        :param c_set2: a specific set of clusters to comapre with set 1
-        :param exp_matrix: the dataframe containing the dataset with rows are cells and columns are genes
+        :param c_set2: a specific set of clusters to compare with set 1
         :param c_arr: the array storing the cluster id each cell belonging to
-        :param tmp_input_prefix: temporary file to be written out for importing by MAST in an R environment
-        :param tmp_result_prefix: temporary result file output by MAST
         """
-        c_arr = np.array(c_arr)
+        # change directory to this script's
+        abspath = os.path.abspath(__file__)
+        dname = os.path.dirname(abspath)
+        os.chdir(dname)
+
+        c_arr = self.clusterinfo.cluster['cluster'].values
         c_set1 = list(c_set1)
         c_set2 = list(c_set2) if c_set2 is not None else list(set(c_arr)-set(c_set1))
-        print(c_set1), print(c_set2)
 
         tmp_input_file, tmp_output_file = "SCRAS_MAST_tmp_in.csv", "SCRAS_MAST_tmp_out.csv"
 
@@ -664,6 +668,7 @@ class SCData:
                                              for i in range(len(reduced_exp_matrix1.index) +
                                                             len(reduced_exp_matrix2.index))])
         reduced_exp_matrix.to_csv(tmp_input_file)
+        print(reduced_exp_matrix)
 
         args = 'RScript ../MAST/runMAST.R {i} {o}'.format(i=tmp_input_file, o=tmp_output_file)
 
@@ -676,7 +681,7 @@ class SCData:
         result_df = result_df[['cont.Pr(>Chisq)']].sort_values(by='cont.Pr(>Chisq)')
         os.remove(tmp_input_file), os.remove(tmp_output_file)
 
-        key = (set(c_set1), set(c_set2))
+        key = (tuple(sorted(c_set1)), tuple(sorted(c_set2)))
         if self.deainfo is None:
             self.deainfo = DEA(key, result_df)
         else:
