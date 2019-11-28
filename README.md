@@ -1,7 +1,7 @@
 Single Cell RNA Analysis Suite (SCRAS)
 -------------------------------------------------------
 
-SCRAS is been implemented in Python3.
+SCRAS is implemented in Python3.
 
 #### Installation
 
